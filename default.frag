@@ -14,6 +14,6 @@ void main()
 {
 //функция берет текстуру и ее координаты и возвращает цвет из текстуры в указанных координатах
     vec4 texColor = texture(screenTexture, TexCoords);
-    FragColor = texture(screenTexture, TexCoords);
+    FragColor = texColor;
 
 }

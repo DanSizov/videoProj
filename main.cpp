@@ -16,8 +16,9 @@
 #include"VBO.h"
 #include"Vertices.h"
 #include "Indices.h" 
-#include"ShaderLoader.h"
 #include"ShaderHelper.h"
+#include"shaderClass.h"
+#include"Camera.h"
 
 int width, height;
 //матрица для преобразования вершин
@@ -30,82 +31,6 @@ GLfloat matrix[16] = {
 
 //коэффициент для преобразования изображения в шейдере
 GLfloat color = 0.75;
-
-//последнее положение курсора мыши
-float lastX = 400.0f;
-float lastY = 300.0f;
-//поворот вокруг Х (вверх и вниз!)
-float pitch = 0.0f;
-//поворот аокруг Y (влево, вправо)
-float yaw = -90.0f;
-//вектор, указывающий направление, в котором смотрит камера (вперед)
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-float cameraSpeed = 0.05f;
-//true когда левая кнопка нажата, false когда отпущена
-bool mousePressed = false;
-//обнаружение первого события движения мыши для исключения скачка в положении курсора
-bool firstMouseMove = true;
-
-//обновление положения и ориентации камеры в соответствии перемещения мыши
-void MouseCallback(GLFWwindow* window, double xpos, double ypos) {
-
-	//проверка, является ли текущее перемещение первым после нажатия кнопки мыши
-	if (firstMouseMove) {
-		lastX = xpos;
-		lastY = ypos;
-		firstMouseMove = false;
-	}
-
-	//вычисление положения курсора по сравнению с последним известным положением, значения инвертированы тк в GLFW координаты увеличиваются сверху вниз
-	float xoffset = -xpos + lastX;
-	float yoffset = -lastY + ypos;
-	//обновление переменных до текущего положения курсора
-	lastX = xpos;
-	lastY = ypos;
-	//чувствительность к перемещению камеры
-	float sensitivity = 0.1f;
-	glm::vec3 direction;
-
-	//если нажата левая кнопка
-	if (mousePressed) {
-		//изменения положения курсора масштабируются
-		xoffset *= sensitivity;
-		yoffset *= sensitivity;
-
-		//обновление углов поворота камеры на основе изменения положения курсора
-		yaw += xoffset;
-		pitch += yoffset;
-
-		if (pitch > 89.0f)
-			pitch = 89.0f;
-		if (pitch < -89.0f)
-			pitch = -89.0f;
-
-		//вычисление нового направления камеры на основе углов камеры
-		direction.x = cos(glm::radians(yaw)) * cos(glm::radians(pitch));
-		direction.y = sin(glm::radians(pitch));
-		direction.z = sin(glm::radians(yaw)) * cos(glm::radians(pitch));
-
-		//вектор направления камеры обновляется и нромализуется
-		cameraFront = glm::normalize(direction);
-	}
-}
-
-//void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-//
-//	if (button == GLFW_MOUSE_BUTTON_LEFT) {
-//		if (action == GLFW_PRESS) {
-//			mousePressed = true;
-//		}
-//		else if (action == GLFW_RELEASE) {
-//			mousePressed = false;
-//		}
-//	}
-//}
-
-void MouseButtonCallback(GLFWwindow* window, int button, int action, int mods) {
-	mousePressed = (button == GLFW_MOUSE_BUTTON_LEFT) && (action == GLFW_PRESS);
-}
 
 int main() {
 
@@ -176,7 +101,6 @@ int main() {
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
 	//загрузка и компиляция шейдеров
-	GLuint shaderProgram1 = ShaderLoader::LoadShader("default.vert", "default.frag");
 
 	VAO VAO1;
 	VBO VBO1(verticesOriginal, sizeof(verticesOriginal));
@@ -188,52 +112,42 @@ int main() {
 	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-	GLuint shaderProgram2 = ShaderLoader::LoadShader("matrix.vert", "green.frag");
+	Shader shaderProgram2("matrix.vert", "green.frag");
+	shaderProgram2.Activate();
 
-	ShaderHelper::PrepareProgram(shaderProgram2);
+	auto locationMatrix = glGetUniformLocation(shaderProgram2.ID, "sh_matrix");
+	auto locationVariable = glGetUniformLocation(shaderProgram2.ID, "colorVariable");
 
-	auto locationMatrix = ShaderHelper::GetLocation(shaderProgram2, "sh_matrix");
-	auto locationVariable = ShaderHelper::GetLocation(shaderProgram2, "colorVariable");
+	Shader shaderProgram1("default.vert", "default.frag");
+	shaderProgram1.Activate();
 
-	glUseProgram(shaderProgram1);
-
-	//определение начальной позиции камеры в 3Д пространстве (3 единицы вдоль оси z, смотрящей от экрана)
-	glm::vec3 cameraPos = glm::vec3(1.0f, 0.0f, 3.0f);
-	//определение вектора, который указывает наверх, камера смотрит по Y
-	glm::vec3 cameraUp = glm::vec3(0.0f, 1.0f, 0.0f);
+	Camera camera(800, 800, glm::vec3(1.0f, 0.0f, 5.0f));
+	camera.Matrix(shaderProgram1, "camMatrix");
 
 	//создание и передача матрицы в шейдер, все координаты вершин модели будут преобразованы из локального пространства в мировое и будут перемещены на 1 единицу от камеры
 	//модельная матрица для вращения, перемещения, масштабирования объекта
 	glm::mat4 model1 = glm::mat4(1.0f);
-	model1 = glm::translate(model1, glm::vec3(0.0f, 0.0f, -1.0f));
+	model1 = glm::translate(model1, glm::vec3(0.0f, 0.0f, 1.0f));
 	model1 = glm::rotate(model1, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	auto locationModel = ShaderHelper::GetLocation(shaderProgram1, "model");
+	auto locationModel = glGetUniformLocation(shaderProgram1.ID, "model");
 	ShaderHelper::PassMatrix(glm::value_ptr(model1), locationModel);
 
 	glm::mat4 model2 = glm::mat4(1.0f);
-	model2 = glm::translate(model2, glm::vec3(2.0f, 0.0f, -1.0f));
+	model2 = glm::translate(model2, glm::vec3(2.0f, 0.0f, 1.0f));
 	model2 = glm::rotate(model2, glm::radians(-30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ShaderHelper::PassMatrix(glm::value_ptr(model2), locationModel);
 
-	glm::vec3 target = glm::vec3(1.0f, 0.0f, -1.0f);
-	//матрица вида, смотрящая от определенной позиции на определенную точку, преобразование координат модели из мирового пространства в пространство камеры
-	glm::mat4 view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-	//view = glm::lookAt(glm::vec3(0.0f, 0.0f, 3.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	auto locationView = ShaderHelper::GetLocation(shaderProgram1, "view");
-	ShaderHelper::PassMatrix(glm::value_ptr(view), locationView);
-
 	//матрица, определяющая как 3Д сцена будет проецироваться на 2Д экран
-	glm::mat4 projection = glm::mat4(1.0f);
-	projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-	auto locationProjection = ShaderHelper::GetLocation(shaderProgram1, "projection");
-	ShaderHelper::PassMatrix(glm::value_ptr(projection), locationProjection);
+	//glm::mat4 projection = glm::mat4(1.0f);
+	//projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
+	//auto locationProjection = glGetUniformLocation(shaderProgram1.ID, "projection");
+	//ShaderHelper::PassMatrix(glm::value_ptr(projection), locationProjection);
 
-	glfwSetCursorPosCallback(window1, MouseCallback);
-	glfwSetMouseButtonCallback(window1, MouseButtonCallback);
 
 	//cube
 	//ширина, высота, колияество каналов изображения
 	int widthIm, heightIm, nrChannels;
+	float rotationAngle = 0.0f;
 	//загрузка изображения
 	unsigned char* data = stbi_load("brick.png", &widthIm, &heightIm, &nrChannels, 0);
 	GLuint textureCube;
@@ -276,18 +190,16 @@ int main() {
 	VAO2.LinkAttrib(VBO2, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
 	VAO2.LinkAttrib(VBO2, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
-	glm::vec3 cubePos = glm::vec3(-3.0f, -3.0f, -3.0f);
+	glm::vec3 cubePos = glm::vec3(1.0f, 0.0f, 1.0f);
 
 	glm::mat4 modelCube = glm::mat4(1.0f);
 	modelCube = glm::translate(modelCube, cubePos);
-	auto locationModelCube = ShaderHelper::GetLocation(shaderProgram1, "model");
+	//modelCube = glm::rotate(modelCube, rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
+	auto locationModelCube = glGetUniformLocation(shaderProgram1.ID, "model");
 	ShaderHelper::PassMatrix(glm::value_ptr(modelCube), locationModelCube);
-
-	//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 
 	glEnable(GL_DEPTH_TEST);
 
-	//основной цикл
 	while (!glfwWindowShouldClose(window1) && !glfwWindowShouldClose(window2))
 	{
 		//захват нового кадра
@@ -295,23 +207,14 @@ int main() {
 		if (frame.empty()) {
 			break;
 		}
-
 		glfwMakeContextCurrent(window1);
-		glUseProgram(shaderProgram1);
 
-
-		if (glfwGetKey(window1, GLFW_KEY_UP) == GLFW_PRESS) {
-			cameraPos.z -= cameraSpeed;
-		}
-		if (glfwGetKey(window1, GLFW_KEY_DOWN) == GLFW_PRESS) {
-			cameraPos.z += cameraSpeed;
-		}
-
-		//генерация матрицы, которая смотрит от позиции камеры cameraPos вдоль вектора направления камеры cameraFront, последний аргумент - "верхний"
-		view = glm::lookAt(cameraPos, cameraPos + cameraFront, cameraUp);
-		auto locationView = ShaderHelper::GetLocation(shaderProgram1, "view");
-		ShaderHelper::PassMatrix(glm::value_ptr(view), locationView);
-
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		shaderProgram1.Activate();
+		camera.Inputs(window1);
+		camera.updateMatrix(45.0f, 0.1f, 100.0f);
+		//camera.Matrix(shaderProgram1, "view");
+		camera.Matrix(shaderProgram1, "camMatrix");
 
 		VAO1.Bind();
 		VBO1.Bind();
@@ -329,7 +232,6 @@ int main() {
 		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glfwGetFramebufferSize(window1, &width, &height);
 		glViewport(0, 0, width, height);
-		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
 		//передача матрицы для каждого изображения для их ориентации в пространстве
 		ShaderHelper::PassMatrix(glm::value_ptr(model1), locationModel);
@@ -339,6 +241,7 @@ int main() {
 
 		VAO2.Bind();
 		//передача матрицы для ориентации в пространстве
+		modelCube = glm::rotate(modelCube, 0.05f, glm::vec3(0.0f, 1.0f, 0.0f));
 		ShaderHelper::PassMatrix(glm::value_ptr(modelCube), locationModelCube);
 		//glActiveTexture(GL_TEXTURE0);
 		glBindTexture(GL_TEXTURE_2D, textureCube);
@@ -355,7 +258,7 @@ int main() {
 
 
 		glfwMakeContextCurrent(window2);
-		glUseProgram(shaderProgram2);
+		shaderProgram2.Activate();
 
 		ShaderHelper::PassMatrix(matrix, locationMatrix);
 		ShaderHelper::PassVariable(color, locationVariable);
@@ -389,8 +292,8 @@ int main() {
 	
 	glDeleteTextures(1, &texture1);
 	glDeleteTextures(1, &texture2);
-	glDeleteProgram(shaderProgram1);
-	glDeleteProgram(shaderProgram2);
+	shaderProgram1.Delete();
+	shaderProgram2.Delete();
 
 	cap.release();
 

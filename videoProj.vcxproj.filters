@@ -21,7 +21,7 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Source.cpp">
+    <ClCompile Include="main.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="VAO.cpp">
@@ -33,10 +33,13 @@
     <ClCompile Include="EBO.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderLoader.cpp">
+    <ClCompile Include="ShaderHelper.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="ShaderHelper.cpp">
+    <ClCompile Include="shaderClass.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Camera.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -73,10 +76,13 @@
     <ClInclude Include="Indices.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ShaderLoader.h">
+    <ClInclude Include="ShaderHelper.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="ShaderHelper.h">
+    <ClInclude Include="shaderClass.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Camera.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
