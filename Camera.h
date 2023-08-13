@@ -32,6 +32,9 @@ public:
 	void updateMatrix(float FOVdeg, float nearPlane, float farPlane);
 	void Matrix(Shader& shader, const char* uniform);
 	void Inputs(GLFWwindow* window);
+	glm::mat4 getMatrix();
+	void resetMatrix();
+	void setMatrix(glm::mat4& newMatrix);
 };
 
 #endif // !CAMERA_CLASS_H

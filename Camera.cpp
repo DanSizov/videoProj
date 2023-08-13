@@ -19,6 +19,18 @@ void Camera::updateMatrix(float FOVdeg, float nearPlane, float farPlane) {
 
 }
 
+glm::mat4 Camera::getMatrix() {
+	return cameraMatrix;
+}
+
+void Camera::resetMatrix() {
+	cameraMatrix = glm::mat4(1.0f);
+}
+
+void Camera::setMatrix(glm::mat4& newMatrix) {
+	cameraMatrix = newMatrix;
+}
+
 void Camera::Matrix(Shader& shader, const char* uniform) {
 	glUniformMatrix4fv(glGetUniformLocation(shader.ID, uniform), 1, GL_FALSE, glm::value_ptr(cameraMatrix));
 }
@@ -46,7 +58,7 @@ void Camera::Inputs(GLFWwindow* window) {
 	if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
 		speed = 0.4f;
 	}
-	else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) {
+	else if (glfwGetKey(window, GLFW_KEY_LEFT_SHIFT) == GLFW_RELEASE) {
 		speed = 0.1f;
 	}
 

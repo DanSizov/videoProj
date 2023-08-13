@@ -10,6 +10,7 @@
 #include<glm/gtx/rotate_vector.hpp>
 #include<glm/gtx/vector_angle.hpp>
 #include<stb/stb_image.h>
+//#include <opencv2/aruco.hpp>
 
 #include"EBO.h"
 #include"VAO.h"
@@ -56,13 +57,8 @@ int main() {
 	}
 
 	//function to free resources
-	// 
-	// 
-	// 
-	// 
-	// 
-	//установка контекста
 
+	//установка контекста
 	glfwMakeContextCurrent(window1);
 
 	//инициализаци€ GLEW
@@ -100,6 +96,12 @@ int main() {
 	//устанавливаем магнитный фильтр на линейный дл€ линейной интерпол€ции при увеличении текстуры
 	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
+
+	/////////
+	VAO fullScreenVAO;
+	VBO fullScreenVBO1(verticesHalf1, sizeof(verticesHalf1));
+	VBO fullScreenVBO2(verticesHalf2, sizeof(verticesHalf2));
+	////////
 	//загрузка и компил€ци€ шейдеров
 
 	VAO VAO1;
@@ -136,13 +138,6 @@ int main() {
 	model2 = glm::translate(model2, glm::vec3(2.0f, 0.0f, 1.0f));
 	model2 = glm::rotate(model2, glm::radians(-30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	ShaderHelper::PassMatrix(glm::value_ptr(model2), locationModel);
-
-	//матрица, определ€юща€ как 3ƒ сцена будет проецироватьс€ на 2ƒ экран
-	//glm::mat4 projection = glm::mat4(1.0f);
-	//projection = glm::perspective(glm::radians(45.0f), 800.0f / 600.0f, 0.1f, 100.0f);
-	//auto locationProjection = glGetUniformLocation(shaderProgram1.ID, "projection");
-	//ShaderHelper::PassMatrix(glm::value_ptr(projection), locationProjection);
-
 
 	//cube
 	//ширина, высота, коли€ество каналов изображени€
@@ -200,6 +195,10 @@ int main() {
 
 	glEnable(GL_DEPTH_TEST);
 
+	glm::mat4 staticCameraMatrix = glm::mat4(1.0f);
+	auto locationCamMatrix = glGetUniformLocation(shaderProgram1.ID, "camMatrix");
+
+
 	while (!glfwWindowShouldClose(window1) && !glfwWindowShouldClose(window2))
 	{
 		//захват нового кадра
@@ -207,14 +206,45 @@ int main() {
 		if (frame.empty()) {
 			break;
 		}
+
 		glfwMakeContextCurrent(window1);
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+		glDisable(GL_DEPTH_TEST);
+
+		glm::mat4 originalCamMatrix = camera.getMatrix();
+		camera.resetMatrix();
+		camera.Matrix(shaderProgram1, "camMatrix");
+
 		shaderProgram1.Activate();
+		ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
+		fullScreenVAO.Bind();
+		fullScreenVBO1.Bind();
+
+		fullScreenVAO.LinkAttrib(fullScreenVBO1, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
+		fullScreenVAO.LinkAttrib(fullScreenVBO1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+
+		glBindTexture(GL_TEXTURE_2D, texture1);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		fullScreenVBO1.Unbind();
+		fullScreenVBO2.Bind();
+		fullScreenVAO.LinkAttrib(fullScreenVBO2, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
+		fullScreenVAO.LinkAttrib(fullScreenVBO2, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+		glBindTexture(GL_TEXTURE_2D, texture1);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+
+		fullScreenVAO.Unbind();
+		fullScreenVBO2.Unbind();
+
+		camera.setMatrix(originalCamMatrix);
+		camera.Matrix(shaderProgram1, "camMatrix");
+		glClear(GL_DEPTH_BUFFER_BIT);
+		//glEnable(GL_DEPTH_TEST);
 		camera.Inputs(window1);
 		camera.updateMatrix(45.0f, 0.1f, 100.0f);
 		//camera.Matrix(shaderProgram1, "view");
-		camera.Matrix(shaderProgram1, "camMatrix");
+		//camera.Matrix(shaderProgram1, "camMatrix");
 
 		VAO1.Bind();
 		VBO1.Bind();
@@ -223,13 +253,15 @@ int main() {
 		VAO1.LinkAttrib(VBO1, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
 		VAO1.LinkAttrib(VBO1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
+		glEnable(GL_DEPTH_TEST);
+
 		//активаци€ шейдерной программы
 		//обновление текстуры
 		glBindTexture(GL_TEXTURE_2D, texture1);
 		//замена данных текущей текстуры данными из нового кадра
 		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
 		//очистка буферов, цвет черный 
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+		//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 		glfwGetFramebufferSize(window1, &width, &height);
 		glViewport(0, 0, width, height);
 
@@ -290,6 +322,11 @@ int main() {
 	VBO1.Delete();
 	EBO1.Delete();
 	
+	fullScreenVAO.Delete();
+	fullScreenVBO1.Delete();
+	fullScreenVBO2.Delete();
+	fullScreenVBO2.Delete();
+
 	glDeleteTextures(1, &texture1);
 	glDeleteTextures(1, &texture2);
 	shaderProgram1.Delete();
