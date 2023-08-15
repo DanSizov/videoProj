@@ -10,7 +10,8 @@
 #include<glm/gtx/rotate_vector.hpp>
 #include<glm/gtx/vector_angle.hpp>
 #include<stb/stb_image.h>
-//#include <opencv2/aruco.hpp>
+#include<opencv2/calib3d.hpp>
+#include<opencv2/aruco.hpp>
 
 #include"EBO.h"
 #include"VAO.h"
@@ -33,7 +34,90 @@ GLfloat matrix[16] = {
 //коэффициент для преобразования изображения в шейдере
 GLfloat color = 0.75;
 
+//визуализация трехмерных осей координат на двумерном изображении
+//image - изображение, на котором будут нарисованы оси
+//cameraMatrix - матрица внутренних параметров камеры
+//distCoeffs - коэффициенты искажения камеры
+//rvec - вектор вращения, который описывает вращение между моделью и камерой
+//tvec - вектор смещения, который описывает смещение между моделью и камерой
+//length - длина осей координат
+void drawAxis(cv::Mat& image, cv::Mat& cameraMatrix, cv::Mat& distCoeffs, cv::Vec3d& rvec, cv::Vec3d& tvec, float length = 50) {
+	//список, содержащий 4 точки: начало осей и 3 координаты
+	std::vector<cv::Point3f> axisPoints;
+	axisPoints.push_back(cv::Point3f(0, 0, 0));
+	axisPoints.push_back(cv::Point3f(length, 0, 0));
+	axisPoints.push_back(cv::Point3f(0, length, 0));
+	axisPoints.push_back(cv::Point3f(0, 0, length));
+	//список, который содержит соответствующие 2Д координаты на изображении для каждой из 3Д точек
+	std::vector<cv::Point2f> imagePoints;
+	//проецирование 3Д точек на 2Д изображение с учетом параметров камеры и позиции объекта
+	cv::projectPoints(axisPoints, rvec, tvec, cameraMatrix, distCoeffs, imagePoints);
+
+	//рисование линии между спроектированными точками
+	cv::line(image, imagePoints[0], imagePoints[1], cv::Scalar(0, 0, 255), 3); // X axis in red
+	cv::line(image, imagePoints[0], imagePoints[2], cv::Scalar(0, 255, 0), 3); // Y axis in green
+	cv::line(image, imagePoints[0], imagePoints[3], cv::Scalar(255, 0, 0), 3); // Z axis in blue
+}
+
 int main() {
+
+
+
+
+	//размер шахматной доски
+	int boardWidth = 7;
+	int boardHeight = 7;
+	//размер квадрата
+	float squareSize = 50.0f;
+
+	//вектор, содержащий углы шахматной доски, найденные на каждом изображении
+	std::vector<std::vector<cv::Point2f>> imagePoints;
+
+	//вектор изображений
+	std::vector<cv::Mat> images;
+	for (int i = 1; i <= 12; i++) {
+		std::string filename = "C:/CameraCalibrationPhotos/" + std::to_string(i) + ".jpg";
+		cv::Mat img = cv::imread(filename);
+		if (img.empty()) {
+			std::cout << "Cannot load the image: " << filename << std::endl;
+			continue;
+		}
+		images.push_back(img);
+	}
+
+	//вектор для углов шахматной доски
+	std::vector<cv::Point2f> chessboardСorners;
+	//поиск углов на изображении
+	for (const auto& img : images) {
+		//функция для поиска углов шахматной доски
+		bool found = cv::findChessboardCorners(img, cv::Size(boardWidth, boardHeight), chessboardСorners);
+		if (found) {
+			imagePoints.push_back(chessboardСorners);
+		}
+	}
+
+	//создание 3Д координат углов шахматной доски
+	std::vector<std::vector<cv::Point3f>> objectPoints(1);
+	for (int i = 0; i < boardHeight; i++) {
+		for (int j = 0; j < boardWidth; j++) {
+			objectPoints[0].push_back(cv::Point3f(j * squareSize, i * squareSize, 0));
+		}
+	}
+	objectPoints.resize(imagePoints.size(), objectPoints[0]);
+
+	//калибровка камеры
+	cv::Mat cameraMatrix, distCoeffs;
+	std::vector<cv::Mat> rvecs, tvecs;
+	//калибровка камеры на основе найденных углов на изображении и их 3Д координатах
+	cv::calibrateCamera(objectPoints, imagePoints, images[0].size(), cameraMatrix, distCoeffs, rvecs, tvecs);
+
+	std::cout << "Camera Matrix: " << cameraMatrix << std::endl;
+	std::cout << "Distortion coefficients: " << distCoeffs << std::endl;
+
+
+
+
+
 
 	//инициализация GLFW
 	if (!glfwInit()) {
@@ -82,6 +166,52 @@ int main() {
 		std::cerr << "Failed to capture video" << std::endl;
 		return -1;
 	}
+
+
+
+
+	//корррекция искажений
+	cv::Mat undistorted;
+	cv::undistort(images[0], undistorted, cameraMatrix, distCoeffs);
+	cv::imshow("Undistorted image", undistorted);
+	cv::waitKey(0);
+
+	//инициализация словаря для обнаружения маркеров на изображении
+	cv::Ptr<cv::aruco::Dictionary> dictionary = cv::makePtr<cv::aruco::Dictionary>(cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250));
+
+	//идентификаторы маркеров и их углов
+	std::vector<int> ids;
+	//маркеры и их углы
+	std::vector<std::vector<cv::Point2f>> corners;
+	//поиск маркеров
+	cv::aruco::detectMarkers(undistorted, dictionary, corners, ids);
+
+	//отображение обнаруженных маркеров и оценка их позы
+	if (ids.size() > 0) {
+		cv::aruco::drawDetectedMarkers(undistorted, corners, ids);
+		std::vector<cv::Vec3d> rvecs, tvecs;
+		cv::aruco::estimatePoseSingleMarkers(corners, squareSize, cameraMatrix, distCoeffs, rvecs, tvecs);
+		for (int i = 0; i < ids.size(); i++) {
+			drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.05);
+		}
+		cv::imshow("Detected ArUco markers", undistorted);
+		cv::waitKey(0);
+	}
+
+	//сохранение параметров камеры
+	cv::FileStorage fs("camera_parameters.yml", cv::FileStorage::WRITE);
+	fs << "cameraMatrix" << cameraMatrix;
+	fs << "distCoeffs" << distCoeffs;
+	fs.release();
+
+	//cv::FileStorage fs1("camera_parameters.yml", cv::FileStorage::READ);
+	//fs1["cameraMatrix"] >> cameraMatrix;
+	//fs1["distCoeffs"] >> distCoeffs;
+	//fs1.release();
+
+
+
+
 
 	//создание текстуры opengl для отображения видео
 	//создание имени для текстуры и сохранение его в переменной
@@ -198,7 +328,6 @@ int main() {
 	glm::mat4 staticCameraMatrix = glm::mat4(1.0f);
 	auto locationCamMatrix = glGetUniformLocation(shaderProgram1.ID, "camMatrix");
 
-
 	while (!glfwWindowShouldClose(window1) && !glfwWindowShouldClose(window2))
 	{
 		//захват нового кадра
@@ -206,6 +335,37 @@ int main() {
 		if (frame.empty()) {
 			break;
 		}
+
+
+
+		try
+		{
+			rvecs.clear();
+			tvecs.clear();
+			cv::aruco::detectMarkers(frame, dictionary, corners, ids);
+			if (ids.size() > 0) {
+				cv::aruco::estimatePoseSingleMarkers(corners, squareSize, cameraMatrix, distCoeffs, rvecs, tvecs);
+				for (int i = 0; i < ids.size(); i++) {
+					if (corners.empty()) {
+						std::cerr << "No corners detected" << std::endl;
+					}
+					if (i >= rvecs.size() || i >= tvecs.size()) {
+						std::cerr << "Error: rvecs or tvecs do not have enough elements" << std::endl;
+					}
+					cv::Vec3d rvec = rvecs[i];
+					cv::Vec3d tvec = tvecs[i];
+					drawAxis(frame, cameraMatrix, distCoeffs, rvec, tvec, 0.05);
+				}
+			}
+
+		}
+		catch (const std::exception& e)
+		{
+			std::cerr << "openCV exception: " << e.what() << std::endl;
+		}
+
+
+
 
 		glfwMakeContextCurrent(window1);
 
