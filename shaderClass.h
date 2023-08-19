@@ -2,6 +2,8 @@
 #define SHADER_CLASS_H
 
 #include<GL/glew.h>
+#include<glm/glm.hpp>
+
 #include<string>
 #include<fstream>
 #include<sstream>
@@ -26,6 +28,8 @@ public:
 
 	//метод для удаления программы шейдеров. При вызове этого метода, предположительно, вы вызовете glDeleteProgram(ID), чтобы удалить программу шейдеров.
 	void Delete();
+
+	void setMat4(const std::string& name, const glm::mat4& mat) const;
 
 private:
 	void compileErrors(unsigned int shader, const char* type);
