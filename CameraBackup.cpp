@@ -1,24 +1,24 @@
 ////размер шахматной доски
 //int boardWidth = 7;
 //int boardHeight = 7;
-////размер квадрата
-//float squareSize = 50.0f;
-
+//float squareSize = 0.02f; //  2см сторона квадрата шахматной доски
+//
 ////вектор, содержащий углы шахматной доски, найденные на каждом изображении
 //std::vector<std::vector<cv::Point2f>> imagePoints;
-
+//
 ////вектор изображений
 //std::vector<cv::Mat> images;
-//for (int i = 1; i <= 12; i++) {
-//	std::string filename = "C:/CameraCalibrationPhotos/" + std::to_string(i) + ".jpg";
-//	cv::Mat img = cv::imread(filename);
-//	if (img.empty()) {
-//		std::cout << "Cannot load the image: " << filename << std::endl;
-//		continue;
+//for (const auto& entry : std::filesystem::directory_iterator("C:/CameraCalibrationPhotos")) {
+//	if (entry.path().extension() == ".jpg") { // Удостоверимся, что это JPG файл
+//		cv::Mat img = cv::imread(entry.path().string());
+//		if (img.empty()) {
+//			std::cout << "Cannot load the image: " << entry.path() << std::endl;
+//			continue;
+//		}
+//		images.push_back(img);
 //	}
-//	images.push_back(img);
 //}
-
+//
 ////вектор для углов шахматной доски
 //std::vector<cv::Point2f> chessboardСorners;
 ////поиск углов на изображении
@@ -29,7 +29,7 @@
 //		imagePoints.push_back(chessboardСorners);
 //	}
 //}
-
+//
 ////создание 3Д координат углов шахматной доски
 //std::vector<std::vector<cv::Point3f>> objectPoints(1);
 //for (int i = 0; i < boardHeight; i++) {
@@ -38,21 +38,21 @@
 //	}
 //}
 //objectPoints.resize(imagePoints.size(), objectPoints[0]);
-
-
-//std::vector<cv::Mat> rvecs, tvecs;
+//
+//
+//std::vector<cv::Mat> calibRvecs, calibTvecs;
 ////калибровка камеры на основе найденных углов на изображении и их 3Д координатах
-//cv::calibrateCamera(objectPoints, imagePoints, images[0].size(), cameraMatrix, distCoeffs, rvecs, tvecs);
-
+//cv::calibrateCamera(objectPoints, imagePoints, images[0].size(), cameraMatrix, distCoeffs, calibRvecs, calibTvecs);
+//
 //std::cout << "Camera Matrix: " << cameraMatrix << std::endl;
 //std::cout << "Distortion coefficients: " << distCoeffs << std::endl;
-
+//
 ////корррекция искажений
 //cv::Mat undistorted;
 //cv::undistort(images[0], undistorted, cameraMatrix, distCoeffs);
 //cv::imshow("Undistorted image", undistorted);
 //cv::waitKey(0);
-
+//
 ////сохранение параметров камеры
 //cv::FileStorage fs("camera_parameters.yml", cv::FileStorage::WRITE);
 //fs << "cameraMatrix" << cameraMatrix;
