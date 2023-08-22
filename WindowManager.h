@@ -15,7 +15,7 @@ private:
 
 public:
 	WindowManager(const int& width, const int& height, const char* title, GLFWwindow* share = nullptr);
-	bool Close() const;
+	bool close() const;
 	void swapBuffers();
 	void pollEvents();
 	int getWidth() const;
