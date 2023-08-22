@@ -23,6 +23,7 @@
 #include"DrawClass.h"
 #include"WindowManager.h"
 #include"TextureManager.h"
+#include"ArucoMarkerManager.h"
 
 int width, height;
 //матрица для преобразования вершин
@@ -70,7 +71,8 @@ glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 int main() {
 
 
-	cv::Mat cameraMatrix, distCoeffs;
+	cv::Mat cameraMatrix;
+	cv::Mat distCoeffs;
 	WindowManager window1(640, 480, "window1", nullptr);
 
 	//WindowManager window2(640, 480, "window2", window1.getWindow());
@@ -90,36 +92,24 @@ int main() {
 		return -1;
 	}
 
-	//инициализация словаря для обнаружения маркеров на изображении
-	cv::Ptr<cv::aruco::Dictionary> dictionary = cv::makePtr<cv::aruco::Dictionary>(cv::aruco::getPredefinedDictionary(cv::aruco::DICT_6X6_250));
-
 	cv::FileStorage fs1("camera_parameters.yml", cv::FileStorage::READ);
 	fs1["cameraMatrix"] >> cameraMatrix;
 	fs1["distCoeffs"] >> distCoeffs;
 	fs1.release();
+
+	ArucoMarkerManager arucoManager(cameraMatrix, distCoeffs, cv::aruco::DICT_6X6_250);
 
 	//идентификаторы маркеров и их углов
 	std::vector<int> ids;
 	//маркеры и их углы
 	std::vector<std::vector<cv::Point2f>> corners;
 	//поиск маркеров
-	cv::aruco::detectMarkers(frame, dictionary, corners, ids);
 
-	//отображение обнаруженных маркеров и оценка их позы
-	if (ids.size() > 0) {
-		//cv::aruco::drawDetectedMarkers(undistorted, corners, ids);
-		cv::aruco::drawDetectedMarkers(frame, corners, ids);
+	std::vector<cv::Vec3d> rvecs, tvecs;
+	arucoManager.detectAndEstimatePose(frame, ids, corners,0.05, rvecs, tvecs);
 
-		std::vector<cv::Vec3d> rvecs, tvecs;
-		cv::aruco::estimatePoseSingleMarkers(corners, 0.05, cameraMatrix, distCoeffs, rvecs, tvecs);
-
-		for (int i = 0; i < ids.size(); i++) {
-			DrawClass::drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.05);
-		}
-		//cv::imshow("Detected ArUco markers", undistorted);
-		cv::imshow("Detected ArUco markers", frame);
-
-		cv::waitKey(0);
+	for (int i = 0; i < ids.size(); i++) {
+		arucoManager.drawAxis(frame, rvecs[i], tvecs[i], 0.05);
 	}
 
 	TextureManager textureManager;
@@ -189,8 +179,6 @@ int main() {
 
 	glm::mat4 staticCameraMatrix = glm::mat4(1.0f);
 	auto locationCamMatrix = glGetUniformLocation(shaderProgram1.ID, "camMatrix");
-
-	std::vector<cv::Vec3d> rvecs, tvecs;
 
 	double lastTime = glfwGetTime();
 	int nbFrames = 0;
@@ -278,7 +266,7 @@ int main() {
 
 		try {
 			
-			cv::aruco::detectMarkers(frame, dictionary, corners, ids);
+			cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), corners, ids);
 
 			if (ids.size() > 0) {
 				// Оценка позы маркеров, 6 см - размер стороны квадрата маркера
@@ -292,10 +280,9 @@ int main() {
 					// Рисуем ID на изображении
 					cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
 					// Рисуем оси на маркере
-					DrawClass::drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.1);
+					arucoManager.drawAxis(frame, rvecs[i], tvecs[i], 0.1);
 					cv::imwrite("debug_image.jpg", frame);
-
-					DrawClass::drawCube(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.05);
+					arucoManager.drawCube(frame, rvecs[i], tvecs[i], 0.05);
 					glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
 
 					ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);

@@ -24,7 +24,7 @@ WindowManager::WindowManager(const int& width, const int& height, const char* ti
 	}
 }
 
-bool WindowManager::Close() const {
+bool WindowManager::close() const {
 	return glfwWindowShouldClose(window);
 }
 
