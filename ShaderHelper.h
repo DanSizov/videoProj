@@ -11,7 +11,7 @@ public:
 	static void PrepareProgram(const GLuint& shaderProgram);
 	static GLint GetLocation(const GLuint& shaderProgram, const std::string& variable);
 	static void PassVariable(const GLint& variable, const GLint& location);
-	static void PassMatrix(GLfloat* matrix, const GLint& location);
+	static void PassMatrix(const GLfloat* matrix, const GLint& location);
 };
 
 

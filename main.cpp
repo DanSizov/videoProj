@@ -22,6 +22,7 @@
 #include"ShaderHelper.h"
 #include"shaderClass.h"
 #include"Camera.h"
+#include"DrawClass.h"
 
 int width, height;
 //матрица для преобразования вершин
@@ -42,51 +43,6 @@ GLfloat color = 0.75;
 //rvec - вектор вращения, который описывает вращение между моделью и камерой
 //tvec - вектор смещения, который описывает смещение между моделью и камерой
 //length - длина осей координат
-void drawAxis(cv::Mat& image, cv::Mat& cameraMatrix, cv::Mat& distCoeffs, cv::Vec3d& rvec, cv::Vec3d& tvec, float length = 50) {
-	std::vector<cv::Point3f> axisPoints;
-	axisPoints.push_back(cv::Point3f(0, 0, 0)); // Начало осей
-	axisPoints.push_back(cv::Point3f(length, 0, 0)); // Конец оси X
-	axisPoints.push_back(cv::Point3f(0, length, 0)); // Конец оси Y
-	axisPoints.push_back(cv::Point3f(0, 0, length)); // Конец оси Z
-
-	float arrowLength = length / 7;  // Уменьшим размер стрелки
-	float angle = 30.0;  // Угол стрелки в градусах
-	float angleRad = angle * CV_PI / 180.0;  // Угол в радианах
-	float dx = arrowLength * sin(angleRad);  // Разница в координатах по x и y для стрелки
-	float dy = arrowLength * cos(angleRad);
-
-	axisPoints.push_back(cv::Point3f(length - dy, dx, 0)); // Стрелка для X
-	axisPoints.push_back(cv::Point3f(length - dy, -dx, 0)); // Стрелка для X
-	axisPoints.push_back(cv::Point3f(dx, length - dy, 0)); // Стрелка для Y
-	axisPoints.push_back(cv::Point3f(-dx, length - dy, 0)); // Стрелка для Y
-	axisPoints.push_back(cv::Point3f(0, dx, length - dy)); // Стрелка для Z
-	axisPoints.push_back(cv::Point3f(0, -dx, length - dy)); // Стрелка для Z
-
-	std::vector<cv::Point2f> imagePoints;
-	cv::projectPoints(axisPoints, rvec, tvec, cameraMatrix, distCoeffs, imagePoints);
-
-	// Рисование осей
-	cv::line(image, imagePoints[0], imagePoints[1], cv::Scalar(0, 0, 255), 3); // X axis in red
-	cv::line(image, imagePoints[0], imagePoints[2], cv::Scalar(0, 255, 0), 3); // Y axis in green
-	cv::line(image, imagePoints[0], imagePoints[3], cv::Scalar(255, 0, 0), 3); // Z axis in blue
-
-	// Рисование стрелок
-	cv::line(image, imagePoints[1], imagePoints[4], cv::Scalar(0, 0, 255), 3);
-	cv::line(image, imagePoints[1], imagePoints[5], cv::Scalar(0, 0, 255), 3);
-	cv::line(image, imagePoints[2], imagePoints[6], cv::Scalar(0, 255, 0), 3);
-	cv::line(image, imagePoints[2], imagePoints[7], cv::Scalar(0, 255, 0), 3);
-	cv::line(image, imagePoints[3], imagePoints[8], cv::Scalar(255, 0, 0), 3);
-	cv::line(image, imagePoints[3], imagePoints[9], cv::Scalar(255, 0, 0), 3);
-
-	int fontFace = cv::FONT_HERSHEY_SIMPLEX;
-	double fontScale = 0.5;
-	int thickness = 2;
-
-	// Подписи осей
-	cv::putText(image, "X", imagePoints[1], fontFace, fontScale, cv::Scalar(0, 0, 255), thickness);
-	cv::putText(image, "Y", imagePoints[2], fontFace, fontScale, cv::Scalar(0, 255, 0), thickness);
-	cv::putText(image, "Z", imagePoints[3], fontFace, fontScale, cv::Scalar(255, 0, 0), thickness);
-}
 
 //преобразование векторов вращения и трансляции в матрицу модели 4х4
 glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
@@ -202,7 +158,7 @@ int main() {
 		cv::aruco::estimatePoseSingleMarkers(corners, 0.05, cameraMatrix, distCoeffs, rvecs, tvecs);
 
 		for (int i = 0; i < ids.size(); i++) {
-			drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.05);
+			DrawClass::drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.05);
 		}
 		//cv::imshow("Detected ArUco markers", undistorted);
 		cv::imshow("Detected ArUco markers", frame);
@@ -429,9 +385,6 @@ int main() {
 				cv::aruco::estimatePoseSingleMarkers(corners, 0.06, cameraMatrix, distCoeffs, rvecs, tvecs);
 				for (int i = 0; i < ids.size(); i++) {
 
-					std::cout << "Rotation vector for marker ID " << ids[i] << ": (" << rvecs[i][0] << ", " << rvecs[i][1] << ", " << rvecs[i][2] << ")" << std::endl;
-					std::cout << "Translation vector for marker ID " << ids[i] << ": (" << tvecs[i][0] << ", " << tvecs[i][1] << ", " << tvecs[i][2] << ")" << std::endl;
-
 					// Вычисляем координаты для размещения текста (например, центр первого угла маркера)
 					cv::Point2f textPosition = corners[i][0];
 					// Преобразуем ID маркера в строку
@@ -439,9 +392,17 @@ int main() {
 					// Рисуем ID на изображении
 					cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
 					// Рисуем оси на маркере
-					drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.1); // 0.05 - это длина оси
+					DrawClass::drawAxis(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.1);
 					cv::imwrite("debug_image.jpg", frame);
 
+					DrawClass::drawCube(frame, cameraMatrix, distCoeffs, rvecs[i], tvecs[i], 0.05);
+					glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
+
+					ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
+					VAO2.Bind();
+					glBindTexture(GL_TEXTURE_2D, textureCube);
+					glDrawArrays(GL_TRIANGLES, 0, 36);
+					VAO2.Unbind();
 				}
 
 				glBindTexture(GL_TEXTURE_2D, texture1);
@@ -454,28 +415,13 @@ int main() {
 
 				for (int i = 0; i < ids.size(); i++) {			
 					glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
-					//glm::mat4 markerModel = glm::mat4(1.0f); // Единичная матрица, без каких-либо преобразований
 
-					std::cout << "Transformation matrix for marker ID: " << ids[i] << std::endl;
-					for (int row = 0; row < 4; ++row) {
-						for (int col = 0; col < 4; ++col) {
-							std::cout << "markerModel[row][col]: " << markerModel[row][col] << std::endl;
-						}
-					}
-
-					for (int j = 0; j < 8; j++) {
-						glm::vec4 transformedVertex = markerModel * glm::vec4(cubeVerticesMarker[j * 5], cubeVerticesMarker[j * 5 + 1], cubeVerticesMarker[j * 5 + 2], 1.0f);
-						std::cout << "Cube vertex " << j << " after transformation: (" << transformedVertex.x << ", " << transformedVertex.y << ", " << transformedVertex.z << ")" << std::endl;
-					}
-
-					//markerModel = glm::rotate(markerModel, glm::radians(180.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-					//markerModel = glm::scale(markerModel, glm::vec3(5.0f, 5.0f, 5.0f));
 					ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
-
 					VAO2.Bind();
 					glBindTexture(GL_TEXTURE_2D, textureCube);
 					glDrawArrays(GL_TRIANGLES, 0, 36);
 					VAO2.Unbind();
+
 				}
 
 				fullScreenVAO.Unbind();

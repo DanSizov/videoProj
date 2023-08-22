@@ -18,7 +18,7 @@ void ShaderHelper::PassVariable(const GLint& variable, const GLint& location) {
 	glUniform1f(location, variable);
 }
 
-void ShaderHelper::PassMatrix(GLfloat* matrix, const GLint& location) {
+void ShaderHelper::PassMatrix(const GLfloat* matrix, const GLint& location) {
 	//установка значения переменной в активной шейдерной программе
 	glUniformMatrix4fv(location, 1, GL_FALSE, matrix);
 }
