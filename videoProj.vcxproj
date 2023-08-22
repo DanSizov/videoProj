@@ -144,7 +144,6 @@
     <ClCompile Include="ArucoMarkerManager.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraBackup.cpp" />
-    <ClCompile Include="DrawClass.cpp" />
     <ClCompile Include="EBO.cpp" />
     <ClCompile Include="ShaderClass.cpp" />
     <ClCompile Include="ShaderHelper.cpp" />
@@ -164,7 +163,6 @@
   <ItemGroup>
     <ClInclude Include="ArucoMarkerManager.h" />
     <ClInclude Include="Camera.h" />
-    <ClInclude Include="DrawClass.h" />
     <ClInclude Include="EBO.h" />
     <ClInclude Include="Indices.h" />
     <ClInclude Include="ShaderClass.h" />

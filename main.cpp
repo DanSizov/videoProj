@@ -20,7 +20,6 @@
 #include"ShaderHelper.h"
 #include"ShaderClass.h"
 #include"Camera.h"
-#include"DrawClass.h"
 #include"WindowManager.h"
 #include"TextureManager.h"
 #include"ArucoMarkerManager.h"
