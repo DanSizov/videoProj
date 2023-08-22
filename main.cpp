@@ -1,5 +1,4 @@
 #define GLEW_STATIC
-#define STB_IMAGE_IMPLEMENTATION
 
 #include<opencv2/opencv.hpp>
 #include<GL/glew.h>
@@ -9,7 +8,6 @@
 #include<glm/gtc/type_ptr.hpp>
 #include<glm/gtx/rotate_vector.hpp>
 #include<glm/gtx/vector_angle.hpp>
-#include<stb/stb_image.h>
 #include<opencv2/calib3d.hpp>
 #include<opencv2/aruco.hpp>
 #include<filesystem>
@@ -20,9 +18,11 @@
 #include"Vertices.h"
 #include "Indices.h" 
 #include"ShaderHelper.h"
-#include"shaderClass.h"
+#include"ShaderClass.h"
 #include"Camera.h"
 #include"DrawClass.h"
+#include"WindowManager.h"
+#include"TextureManager.h"
 
 int width, height;
 //матрица для преобразования вершин
@@ -36,14 +36,6 @@ GLfloat matrix[16] = {
 //коэффициент для преобразования изображения в шейдере
 GLfloat color = 0.75;
 
-//визуализация трехмерных осей координат на двумерном изображении
-//image - изображение, на котором будут нарисованы оси
-//cameraMatrix - матрица внутренних параметров камеры
-//distCoeffs - коэффициенты искажения камеры
-//rvec - вектор вращения, который описывает вращение между моделью и камерой
-//tvec - вектор смещения, который описывает смещение между моделью и камерой
-//length - длина осей координат
-
 //преобразование векторов вращения и трансляции в матрицу модели 4х4
 glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 	//преобразование Rodrigues в матрицу вращения
@@ -55,10 +47,6 @@ glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 	model[3][0] = tvec[0];
 	model[3][1] = tvec[1];
 	model[3][2] = tvec[2];
-	
-	//std::cout << "tvec[0]: " << tvec[0] << std::endl;
-	//std::cout << "tvec[1]: " << tvec[1] << std::endl;
-	//std::cout << "tvec[2]: " << tvec[2] << std::endl;
 
 	cv::Matx33d opencvToGL = cv::Matx33d(
 		1.0, 0.0, 0.0,
@@ -83,40 +71,9 @@ int main() {
 
 
 	cv::Mat cameraMatrix, distCoeffs;
+	WindowManager window1(640, 480, "window1", nullptr);
 
-
-	//инициализация GLFW
-	if (!glfwInit()) {
-		std::cerr << "Failed to initialize GLFW" << std::endl;
-		return -1;
-	}
-
-	//создание окна
-	GLFWwindow* window1 = glfwCreateWindow(640, 480, "window1", nullptr, nullptr);
-	if (window1 == nullptr) {
-		std::cerr << "Failed to create window1" << std::endl;
-		glfwTerminate();
-		return -1;
-	}
-
-	//GLFWwindow* window2 = glfwCreateWindow(640, 480, "window2", nullptr, window1);
-	//if (window2 == nullptr) {
-	//	std::cerr << "Failed to create window2" << std::endl;
-	//	glfwTerminate();
-	//	return -1;
-	//}
-
-	//function to free resources
-
-	//установка контекста
-	glfwMakeContextCurrent(window1);
-
-	//инициализация GLEW
-	if (glewInit() != GLEW_OK) {
-		std::cerr << "Failed to initialize GLEW" << std::endl;
-		return -1;
-	}
-
+	//WindowManager window2(640, 480, "window2", window1.getWindow());
 
 	//открытие камеры с помощью opencv
 	cv::VideoCapture cap(0);
@@ -146,7 +103,6 @@ int main() {
 	//маркеры и их углы
 	std::vector<std::vector<cv::Point2f>> corners;
 	//поиск маркеров
-	//cv::aruco::detectMarkers(undistorted, dictionary, corners, ids);
 	cv::aruco::detectMarkers(frame, dictionary, corners, ids);
 
 	//отображение обнаруженных маркеров и оценка их позы
@@ -166,37 +122,20 @@ int main() {
 		cv::waitKey(0);
 	}
 
-	//создание текстуры opengl для отображения видео
-	//создание имени для текстуры и сохранение его в переменной
-	GLuint texture1;
-	glGenTextures(1, &texture1);
-	//используем нашу текстуру как текущую 2D текстуру
-	glBindTexture(GL_TEXTURE_2D, texture1);
-	//загружаем данные изображения в текущую текстуру, определеяем размеры изображения и последующие данные
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
-	//задаем параметр фильтрации для текстуры. минимальный линейный фильтр -> OpenGL будет использовать линейную интерполяцию для выбора цвета текстуры, когда она уменьшается //?
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	//устанавливаем магнитный фильтр на линейный для линейной интерполяции при увеличении текстуры
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+	TextureManager textureManager;
 
+	GLuint texture1 = textureManager.loadTextureFromFrame(frame);
+	GLuint texture2 = textureManager.loadTextureFromFrame(frame);
 
-	/////////
 	VAO fullScreenVAO;
 	VBO fullScreenVBO1(verticesHalf1, sizeof(verticesHalf1));
 	VBO fullScreenVBO2(verticesHalf2, sizeof(verticesHalf2));
-	////////
 	//загрузка и компиляция шейдеров
 
 	VAO VAO1;
 	VBO VBO1(verticesOriginal, sizeof(verticesOriginal));
 	EBO EBO1(indices, sizeof(indices));
 
-	GLuint texture2;
-	glGenTextures(1, &texture2);
-	glBindTexture(GL_TEXTURE_2D, texture2);
-	glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, frame.cols, frame.rows, 0, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-	glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 	Shader shaderProgram2("matrix.vert", "green.frag");
 	shaderProgram2.Activate();
 
@@ -209,8 +148,6 @@ int main() {
 	Camera camera(800, 800, glm::vec3(1.0f, 0.0f, 5.0f));
 	camera.Matrix(shaderProgram1, "camMatrix");
 
-	//создание и передача матрицы в шейдер, все координаты вершин модели будут преобразованы из локального пространства в мировое и будут перемещены на 1 единицу от камеры
-	//модельная матрица для вращения, перемещения, масштабирования объекта
 	glm::mat4 model1 = glm::mat4(1.0f);
 	model1 = glm::translate(model1, glm::vec3(0.0f, 0.0f, 1.0f));
 	model1 = glm::rotate(model1, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -223,39 +160,10 @@ int main() {
 	ShaderHelper::PassMatrix(glm::value_ptr(model2), locationModel);
 
 	//cube
+	GLuint textureCube = textureManager.loadTextureFromFile("brick.png");
+
 	//ширина, высота, колияество каналов изображения
-	int widthIm, heightIm, nrChannels;
 	float rotationAngle = 0.0f;
-	//загрузка изображения
-	unsigned char* data = stbi_load("brick.png", &widthIm, &heightIm, &nrChannels, 0);
-	GLuint textureCube;
-
-	if (data) {
-		glGenTextures(1, &textureCube);
-		glBindTexture(GL_TEXTURE_2D, textureCube);
-
-		//повторение по горизонтали
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-		//повторение по вертикали
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
-		//фильтры
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-		if (nrChannels == 3) {
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, widthIm, heightIm, 0, GL_RGB, GL_UNSIGNED_BYTE, data);
-		}
-		else if (nrChannels == 4) {
-			glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, widthIm, heightIm, 0, GL_RGBA, GL_UNSIGNED_BYTE, data);
-		}
-		//генерация мипмапов для текстуры
-		glGenerateMipmap(GL_TEXTURE_2D);
-	}
-	else {
-		std::cout << "Failed to load the texture" << std::endl;
-	}
-	//освобождение памяти
-	stbi_image_free(data);
 
 	VAO VAO2;
 	VBO VBO2(cubeVerticesMarker, sizeof(cubeVerticesMarker));
@@ -288,7 +196,7 @@ int main() {
 	int nbFrames = 0;
 
 	//while (!glfwWindowShouldClose(window1) && !glfwWindowShouldClose(window2))
-	while (!glfwWindowShouldClose(window1))
+	while (!glfwWindowShouldClose(window1.getWindow()))
 	{
 
 		double currentTime = glfwGetTime();
@@ -305,10 +213,7 @@ int main() {
 			break;
 		}
 
-		//glfwMakeContextCurrent(window1);
-		//glEnable(GL_DEPTH_TEST);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-		//glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glDisable(GL_DEPTH_TEST);
 
 		glm::mat4 originalCamMatrix = camera.getMatrix();
@@ -340,8 +245,7 @@ int main() {
 		camera.Matrix(shaderProgram1, "camMatrix");
 		glClear(GL_DEPTH_BUFFER_BIT);
 
-		//glEnable(GL_DEPTH_TEST);
-		camera.Inputs(window1);
+		camera.Inputs(window1.getWindow());
 		camera.updateMatrix(45.0f, 0.1f, 100.0f);
 		//camera.Matrix(shaderProgram1, "view");
 		//camera.Matrix(shaderProgram1, "camMatrix");
@@ -355,15 +259,11 @@ int main() {
 
 		glEnable(GL_DEPTH_TEST);
 
-		//активация шейдерной программы
-		//обновление текстуры
-		glBindTexture(GL_TEXTURE_2D, texture1);
-		//замена данных текущей текстуры данными из нового кадра
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
+		textureManager.updateTexture(texture1, frame);
 
 		//очистка буферов, цвет черный 
 		//glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-		glfwGetFramebufferSize(window1, &width, &height);
+		glfwGetFramebufferSize(window1.getWindow(), &width, &height);
 		glViewport(0, 0, width, height);
 
 		//передача матрицы для каждого изображения для их ориентации в пространстве
@@ -405,8 +305,7 @@ int main() {
 					VAO2.Unbind();
 				}
 
-				glBindTexture(GL_TEXTURE_2D, texture1);
-				glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
+				textureManager.updateTexture(texture1, frame);
 
 				shaderProgram1.Activate();
 				ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
@@ -436,8 +335,8 @@ int main() {
 			std::cerr << "openCV exception: " << e.what() << std::endl;
 		}
 
-		glfwSwapBuffers(window1);
-		glfwPollEvents();
+		window1.swapBuffers();
+		window1.pollEvents();
 
 	}
 
@@ -452,8 +351,9 @@ int main() {
 	fullScreenVBO2.Delete();
 	fullScreenVBO2.Delete();
 
-	glDeleteTextures(1, &texture1);
-	glDeleteTextures(1, &texture2);
+	textureManager.deleteTexture(texture1);
+	textureManager.deleteTexture(texture2);
+	textureManager.deleteTexture(textureCube);
 	shaderProgram1.Delete();
 	shaderProgram2.Delete();
 
