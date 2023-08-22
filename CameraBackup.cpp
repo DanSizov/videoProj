@@ -151,3 +151,17 @@
 					//glBindTexture(GL_TEXTURE_2D, textureCube);
 					//glDrawArrays(GL_TRIANGLES, 0, 36);
 					//VAO2.Unbind();
+
+					//std::cout << "Transformation matrix for marker ID: " << ids[i] << std::endl;
+					//for (int row = 0; row < 4; ++row) {
+					//	for (int col = 0; col < 4; ++col) {
+					//		std::cout << "markerModel[row][col]: " << markerModel[row][col] << std::endl;
+					//	}
+					//}
+
+					//for (int j = 0; j < 8; j++) {
+					//	glm::vec4 transformedVertex = markerModel * glm::vec4(cubeVerticesMarker[j * 5], cubeVerticesMarker[j * 5 + 1], cubeVerticesMarker[j * 5 + 2], 1.0f);
+					//	std::cout << "Cube vertex " << j << " after transformation: (" << transformedVertex.x << ", " << transformedVertex.y << ", " << transformedVertex.z << ")" << std::endl;
+					//}
+					//std::cout << "Rotation vector for marker ID " << ids[i] << ": (" << rvecs[i][0] << ", " << rvecs[i][1] << ", " << rvecs[i][2] << ")" << std::endl;
+					//std::cout << "Translation vector for marker ID " << ids[i] << ": (" << tvecs[i][0] << ", " << tvecs[i][1] << ", " << tvecs[i][2] << ")" << std::endl;

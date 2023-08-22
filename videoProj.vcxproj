@@ -143,6 +143,7 @@
   <ItemGroup>
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraBackup.cpp" />
+    <ClCompile Include="DrawClass.cpp" />
     <ClCompile Include="EBO.cpp" />
     <ClCompile Include="shaderClass.cpp" />
     <ClCompile Include="ShaderHelper.cpp" />
@@ -159,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Camera.h" />
+    <ClInclude Include="DrawClass.h" />
     <ClInclude Include="EBO.h" />
     <ClInclude Include="Indices.h" />
     <ClInclude Include="shaderClass.h" />
