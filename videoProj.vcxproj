@@ -145,11 +145,13 @@
     <ClCompile Include="CameraBackup.cpp" />
     <ClCompile Include="DrawClass.cpp" />
     <ClCompile Include="EBO.cpp" />
-    <ClCompile Include="shaderClass.cpp" />
+    <ClCompile Include="ShaderClass.cpp" />
     <ClCompile Include="ShaderHelper.cpp" />
     <ClCompile Include="main.cpp" />
+    <ClCompile Include="TextureManager.cpp" />
     <ClCompile Include="VAO.cpp" />
     <ClCompile Include="VBO.cpp" />
+    <ClCompile Include="WindowManager.cpp" />
   </ItemGroup>
   <ItemGroup>
     <None Include="cube.frag" />
@@ -163,11 +165,13 @@
     <ClInclude Include="DrawClass.h" />
     <ClInclude Include="EBO.h" />
     <ClInclude Include="Indices.h" />
-    <ClInclude Include="shaderClass.h" />
+    <ClInclude Include="ShaderClass.h" />
     <ClInclude Include="ShaderHelper.h" />
+    <ClInclude Include="TextureManager.h" />
     <ClInclude Include="VAO.h" />
     <ClInclude Include="VBO.h" />
     <ClInclude Include="Vertices.h" />
+    <ClInclude Include="WindowManager.h" />
   </ItemGroup>
   <ItemGroup>
     <Image Include="..\..\Users\мвидео\Downloads\brick.png" />
