@@ -13,14 +13,18 @@ private:
 	int width;
 	int height;
 
+	static bool glfwInitialized;
+	static int windowCount;
+
 public:
 	WindowManager(const int& width, const int& height, const char* title, GLFWwindow* share = nullptr);
-	bool close() const;
-	void swapBuffers();
-	void pollEvents();
-	int getWidth() const;
-	int getHeight() const;
-	GLFWwindow* getWindow() const;
+	void MakeContextCurrent();
+	bool Close() const;
+	void SwapBuffers();
+	void PollEvents();
+	int GetWidth() const;
+	int GetHeight() const;
+	GLFWwindow* GetWindow() const;
 
 	~WindowManager();
 };

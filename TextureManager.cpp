@@ -2,7 +2,7 @@
 #include "TextureManager.h"
 
 
-GLuint TextureManager::loadTextureFromFrame(const cv::Mat& frame) {
+GLuint TextureManager::LoadTextureFromFrame(const cv::Mat& frame) {
 	GLuint textureID;
 	glGenTextures(1, &textureID);
 	glBindTexture(GL_TEXTURE_2D, textureID);
@@ -15,7 +15,7 @@ GLuint TextureManager::loadTextureFromFrame(const cv::Mat& frame) {
 	return textureID;
 }
 
-GLuint TextureManager::loadTextureFromFile(const std::string& filepath) {
+GLuint TextureManager::LoadTextureFromFile(const std::string& filepath) {
 	int width, height, nrChannels;
 	unsigned char* data = stbi_load(filepath.c_str(), &width, &height, &nrChannels, 0);
 	if (!data) {
@@ -41,12 +41,12 @@ GLuint TextureManager::loadTextureFromFile(const std::string& filepath) {
 	return textureID;
 }
 
-void TextureManager::updateTexture(const GLuint& textureID, const cv::Mat& frame) {
+void TextureManager::UpdateTexture(const GLuint& textureID, const cv::Mat& frame) {
 	glBindTexture(GL_TEXTURE_2D, textureID);
 	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
 }
 
-void TextureManager::deleteTexture(const GLuint& textureID) {
+void TextureManager::DeleteTexture(const GLuint& textureID) {
 	glDeleteTextures(1, &textureID);
 	textures.erase(std::remove(textures.begin(), textures.end(), textureID), textures.end());
 }

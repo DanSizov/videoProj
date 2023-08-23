@@ -16,10 +16,10 @@ public:
 	TextureManager(){}
 	~TextureManager();
 
-	GLuint loadTextureFromFrame(const cv::Mat& frame);
-	GLuint loadTextureFromFile(const std::string& filepath);
-	void updateTexture(const GLuint& textureID, const cv::Mat& frame);
-	void deleteTexture(const GLuint& textureID);
+	GLuint LoadTextureFromFrame(const cv::Mat& frame);
+	GLuint LoadTextureFromFile(const std::string& filepath);
+	void UpdateTexture(const GLuint& textureID, const cv::Mat& frame);
+	void DeleteTexture(const GLuint& textureID);
 };
 
 #endif // !TEXTURE_MANAGER_H
