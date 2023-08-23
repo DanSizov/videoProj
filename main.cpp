@@ -303,7 +303,7 @@ int main() {
 		// ---- Правая половина экрана ----
 		GL_CALL(glViewport(width / 2, 0, width / 2, height));
 
-		shaderProgram1.Activate();  // предполагаю, что вы используете тот же шейдер для обеих половин, иначе замените на другой
+		shaderProgram1.Activate();
 		camera.resetMatrix();
 		ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
 		camera.Matrix(shaderProgram1, "camMatrix");
