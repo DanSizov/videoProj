@@ -1,6 +1,6 @@
 #include "GLDebug.h"
 
-void GLDebug::CheckError(const std::string& description) {
+void GLDebug::CheckError(const std::string& description, const int& line) {
 	GLenum error = glGetError();
 	while (error != GL_NO_ERROR) {
 		std::string errorStr;
@@ -22,7 +22,7 @@ void GLDebug::CheckError(const std::string& description) {
 			errorStr = "UNKNOWN_ERROR";
 			break;
 		}
-		std::cerr << description << ": " << errorStr << std::endl;
+		std::cerr << "Error at: " << line << " - " << description << ": " << errorStr << std::endl;
 		error = glGetError();
 	}
 }

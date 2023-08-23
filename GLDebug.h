@@ -8,7 +8,7 @@
 class GLDebug
 {
 public:
-	static void CheckError(const std::string& description);
+	static void CheckError(const std::string& description, const int& line);
 };
 
 
