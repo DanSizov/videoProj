@@ -1,9 +1,16 @@
 #include "WindowManager.h"
 
+
+bool WindowManager::glfwInitialized{false};
+int WindowManager::windowCount{0};
+
 WindowManager::WindowManager(const int& width, const int& height, const char* title, GLFWwindow* share) {
-	if (!glfwInit()) {
-		std::cerr << "Failed to inititalize GLFW" << std::endl;
-		exit(-1);
+	if (!glfwInitialized) {
+		if (!glfwInit()) {
+			std::cerr << "Failed to initialize GLFW" << std::endl;
+			exit(-1);
+		}
+		glfwInitialized = true;
 	}
 
 	window = glfwCreateWindow(width, height, title, nullptr, share);
@@ -18,28 +25,45 @@ WindowManager::WindowManager(const int& width, const int& height, const char* ti
 
 	glfwMakeContextCurrent(window);
 
-	if (glewInit() != GLEW_OK) {
-		std::cerr << "Failed to initialize GLEW" << std::endl;
-		exit(-1);
+	if (windowCount == 0) {
+		if (glewInit() != GLEW_OK) {
+			std::cerr << "Failed to initialize GLEW" << std::endl;
+			exit(-1);
+		}
 	}
+
+	windowCount++;
 }
 
-bool WindowManager::close() const {
+void WindowManager::MakeContextCurrent() {
+	glfwMakeContextCurrent(window);
+}
+
+
+bool WindowManager::Close() const {
 	return glfwWindowShouldClose(window);
 }
 
-void WindowManager::swapBuffers() {
+void WindowManager::SwapBuffers() {
 	glfwSwapBuffers(window);
 }
 
-void WindowManager::pollEvents() {
+void WindowManager::PollEvents() {
 	glfwPollEvents();
 }
 
-int WindowManager::getWidth() const { return this->width; }
-int WindowManager::getHeight() const { return this->height; }
-GLFWwindow* WindowManager::getWindow() const { return this->window; }
+int WindowManager::GetWidth() const { return this->width; }
+int WindowManager::GetHeight() const { return this->height; }
+GLFWwindow* WindowManager::GetWindow() const { return this->window; }
 
 WindowManager::~WindowManager() {
-	glfwTerminate();
+	if (window != nullptr) {
+		glfwDestroyWindow(window);
+		windowCount--;
+
+		if (windowCount == 0 && glfwInitialized) {
+			glfwTerminate();
+			glfwInitialized = false;
+		}
+	}
 }
