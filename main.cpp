@@ -27,7 +27,8 @@
 
 #define GL_CALL(x) x; GLDebug::CheckError(#x);
 
-int width, height;
+int width{ 640 };
+int height{ 480 };
 //матрица для преобразования вершин
 GLfloat matrix[16] = {
 	0.75, 0.0, 0.0, 0.0,
@@ -70,14 +71,38 @@ glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 	return model;
 }
 
+void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager, GLuint& textureCube, GLint& locationModelCube, const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, VAO& VAO) {
+	std::vector<int> ids;
+	std::vector<cv::Vec3d> rvecs, tvecs;
+	std::vector<std::vector<cv::Point2f>> corners;
+
+	cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), corners, ids);
+
+	if (ids.size() > 0) {
+		cv::aruco::estimatePoseSingleMarkers(corners, 0.06, cameraMatrix, distCoeffs, rvecs, tvecs);
+		for (int i = 0; i < ids.size(); i++) {
+			cv::Point2f textPosition = corners[i][0];
+			std::string idStr = std::to_string(ids[i]);
+			cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
+			arucoManager.drawAxis(frame, rvecs[i], tvecs[i], 0.1);
+			arucoManager.drawCube(frame, rvecs[i], tvecs[i], 0.05);
+			glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
+
+			ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
+			VAO.Bind();
+			glBindTexture(GL_TEXTURE_2D, textureCube);
+			glDrawArrays(GL_TRIANGLES, 0, 36);
+			VAO.Unbind();
+		}
+	}
+}
+
 int main() {
 
 
 	cv::Mat cameraMatrix;
 	cv::Mat distCoeffs;
 	WindowManager window1(640, 480, "window1", nullptr);
-
-	WindowManager window2(640, 480, "window2", window1.GetWindow());
 
 	window1.MakeContextCurrent();
 
@@ -119,24 +144,23 @@ int main() {
 	TextureManager textureManager;
 
 	GLuint texture1 = textureManager.LoadTextureFromFrame(frame);
-	GLuint texture2 = textureManager.LoadTextureFromFrame(frame);
 
-	VAO fullScreenVAO;
-	VBO fullScreenVBO1(verticesHalf1, sizeof(verticesHalf1));
-	VBO fullScreenVBO2(verticesHalf2, sizeof(verticesHalf2));
+	VAO fullScreenVAO1;
+	VBO fullScreenVBO1(fullScreenVertices, sizeof(fullScreenVertices));
+
+	fullScreenVAO1.Bind();
+	fullScreenVBO1.Bind();
+	fullScreenVAO1.LinkAttrib(fullScreenVBO1, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
+	fullScreenVAO1.LinkAttrib(fullScreenVBO1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	fullScreenVAO1.Unbind();
+	fullScreenVBO1.Unbind();
 	//загрузка и компиляция шейдеров
 
-	window2.MakeContextCurrent();
+	//Shader shaderProgram2("matrix.vert", "green.frag");
+	//shaderProgram2.Activate();
 
-	VAO VAO1;
-	VBO VBO1(verticesOriginal, sizeof(verticesOriginal));
-	EBO EBO1(indices, sizeof(indices));
-
-	Shader shaderProgram2("matrix.vert", "green.frag");
-	shaderProgram2.Activate();
-
-	auto locationMatrix = glGetUniformLocation(shaderProgram2.ID, "sh_matrix");
-	auto locationVariable = glGetUniformLocation(shaderProgram2.ID, "colorVariable");
+	//auto locationMatrix = glGetUniformLocation(shaderProgram2.ID, "sh_matrix");
+	//auto locationVariable = glGetUniformLocation(shaderProgram2.ID, "colorVariable");
 
 	window1.MakeContextCurrent();
 
@@ -191,7 +215,7 @@ int main() {
 	double lastTime = glfwGetTime();
 	int nbFrames = 0;
 
-	while (!window1.Close() && (!window2.Close()))
+	while (!window1.Close())
 	{
 
 		double currentTime = glfwGetTime();
@@ -219,24 +243,13 @@ int main() {
 
 		shaderProgram1.Activate();
 		ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
-		fullScreenVAO.Bind();
+		fullScreenVAO1.Bind();
 		fullScreenVBO1.Bind();
 
-		fullScreenVAO.LinkAttrib(fullScreenVBO1, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
-		fullScreenVAO.LinkAttrib(fullScreenVBO1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-
 		glBindTexture(GL_TEXTURE_2D, texture1);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
-
+		fullScreenVAO1.Unbind();
 		fullScreenVBO1.Unbind();
-		fullScreenVBO2.Bind();
-		fullScreenVAO.LinkAttrib(fullScreenVBO2, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
-		fullScreenVAO.LinkAttrib(fullScreenVBO2, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-		glBindTexture(GL_TEXTURE_2D, texture1);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-
-		fullScreenVAO.Unbind();
-		fullScreenVBO2.Unbind();
 
 		camera.setMatrix(originalCamMatrix);
 		camera.Matrix(shaderProgram1, "camMatrix");
@@ -253,130 +266,25 @@ int main() {
 		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
 		glViewport(0, 0, width, height);
 
-		try {
-			
-			cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), corners, ids);
-
-			if (ids.size() > 0) {
-				// Оценка позы маркеров, 6 см - размер стороны квадрата маркера
-				cv::aruco::estimatePoseSingleMarkers(corners, 0.06, cameraMatrix, distCoeffs, rvecs, tvecs);
-				for (int i = 0; i < ids.size(); i++) {
-
-					// Вычисляем координаты для размещения текста (например, центр первого угла маркера)
-					cv::Point2f textPosition = corners[i][0];
-					std::string idStr = std::to_string(ids[i]);
-					cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
-					arucoManager.drawAxis(frame, rvecs[i], tvecs[i], 0.1);
-					cv::imwrite("debug_image.jpg", frame);
-					arucoManager.drawCube(frame, rvecs[i], tvecs[i], 0.05);
-					glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
-
-					ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
-					VAO2.Bind();
-					glBindTexture(GL_TEXTURE_2D, textureCube);
-					glDrawArrays(GL_TRIANGLES, 0, 36);
-					VAO2.Unbind();
-				}
-
-				textureManager.UpdateTexture(texture1, frame);
-
-				shaderProgram1.Activate();
-				ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
-				fullScreenVAO.Bind();
-				fullScreenVBO1.Bind();
-
-				for (int i = 0; i < ids.size(); i++) {			
-					glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
-
-					ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
-					VAO2.Bind();
-					glBindTexture(GL_TEXTURE_2D, textureCube);
-					glDrawArrays(GL_TRIANGLES, 0, 36);
-					VAO2.Unbind();
-
-				}
-
-				fullScreenVAO.Unbind();
-				fullScreenVBO1.Unbind();
-			}
-
-			cv::waitKey(1);
-
-
-		}
-		catch (const std::exception& e) {
-			std::cerr << "openCV exception: " << e.what() << std::endl;
-		}
+		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
+		textureManager.UpdateTexture(texture1, frame);
 
 		window1.SwapBuffers();
 		window1.PollEvents();
-
-		window2.MakeContextCurrent();
-
-		GLenum errorglfwMakeContextCurrent = glGetError();
-		if (errorglfwMakeContextCurrent != GL_NO_ERROR) {
-			std::cerr << "ERROR glfwMakeContextCurrent: " << errorglfwMakeContextCurrent << std::endl;
-		}
-		glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-
-		GLenum errorglClearColor = glGetError();
-		if (errorglClearColor != GL_NO_ERROR) {
-			std::cerr << "ERROR glClearColor: " << errorglClearColor << std::endl;
-		}
-
-		glClear(GL_COLOR_BUFFER_BIT);
-
-		GLenum errorglClear = glGetError();
-		if (errorglClear != GL_NO_ERROR) {
-			std::cerr << "ERROR glClear: " << errorglClear << std::endl;
-		}
-
-		shaderProgram2.Activate();
-
-		ShaderHelper::PassMatrix(matrix, locationMatrix);
-		ShaderHelper::PassVariable(color, locationVariable);
-
-		VAO1.Bind();
-		VBO1.Bind();
-		VAO1.BindEBO(EBO1);
-
-		VAO1.LinkAttrib(VBO1, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
-		VAO1.LinkAttrib(VBO1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
-		glBindTexture(GL_TEXTURE_2D, texture1);
-		glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, frame.cols, frame.rows, GL_BGR, GL_UNSIGNED_BYTE, frame.data);
-		glfwGetFramebufferSize(window2.GetWindow(), &width, &height);
-		glViewport(0, 0, width, height);
-		glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, 0);
-		window2.SwapBuffers();
-
-		VAO1.Unbind();
-		VBO1.Unbind();
-		VAO1.UnbindEBO(EBO1);
-
-		textureManager.UpdateTexture(texture1, frame);
-
-		window2.PollEvents();
 	}
 
 	//освобождаем ресурсы
-	VAO1.Delete();
-	VBO1.Delete();
-	EBO1.Delete();
-
 	VAO2.Delete();
 	VBO2.Delete();
 	EBO2.Delete();
 
-	fullScreenVAO.Delete();
+	fullScreenVAO1.Delete();
 	fullScreenVBO1.Delete();
-	fullScreenVBO2.Delete();
-	fullScreenVBO2.Delete();
 
 	textureManager.DeleteTexture(texture1);
-	textureManager.DeleteTexture(texture2);
 	textureManager.DeleteTexture(textureCube);
 	shaderProgram1.Delete();
-	shaderProgram2.Delete();
+	//shaderProgram2.Delete();
 
 	cap.release();
 
