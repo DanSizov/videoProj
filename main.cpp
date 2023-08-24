@@ -144,6 +144,7 @@ int main() {
 	TextureManager textureManager;
 
 	GLuint texture1 = textureManager.LoadTextureFromFrame(frame);
+	GLuint texture2 = textureManager.LoadTextureFromFrame(frame);
 
 	VAO fullScreenVAO1;
 	VBO fullScreenVBO1(fullScreenVertices, sizeof(fullScreenVertices));
@@ -154,6 +155,17 @@ int main() {
 	fullScreenVAO1.LinkAttrib(fullScreenVBO1, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 	fullScreenVAO1.Unbind();
 	fullScreenVBO1.Unbind();
+
+	VAO fullScreenVAO2;
+	VBO fullScreenVBO2(fullScreenVertices, sizeof(fullScreenVertices));
+
+	fullScreenVAO2.Bind();
+	fullScreenVBO2.Bind();
+	fullScreenVAO2.LinkAttrib(fullScreenVBO2, 0, 2, GL_FLOAT, 5 * sizeof(float), (void*)0);
+	fullScreenVAO2.LinkAttrib(fullScreenVBO2, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
+	fullScreenVAO2.Unbind();
+	fullScreenVBO2.Unbind();
+
 	//загрузка и компил€ци€ шейдеров
 
 	//Shader shaderProgram2("matrix.vert", "green.frag");
@@ -243,13 +255,22 @@ int main() {
 
 		shaderProgram1.Activate();
 		ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
+		glViewport(0, 0, width / 2, height);
+
 		fullScreenVAO1.Bind();
 		fullScreenVBO1.Bind();
-
 		glBindTexture(GL_TEXTURE_2D, texture1);
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		fullScreenVAO1.Unbind();
 		fullScreenVBO1.Unbind();
+
+		glViewport(width / 2, 0, width / 2, height);
+		fullScreenVAO2.Bind();
+		fullScreenVBO2.Bind();
+		glBindTexture(GL_TEXTURE_2D, texture2);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
+		fullScreenVAO2.Unbind();
+		fullScreenVBO2.Unbind();
 
 		camera.setMatrix(originalCamMatrix);
 		camera.Matrix(shaderProgram1, "camMatrix");
@@ -261,13 +282,14 @@ int main() {
 		glEnable(GL_DEPTH_TEST);
 
 		textureManager.UpdateTexture(texture1, frame);
+		textureManager.UpdateTexture(texture2, frame);
 
-		//очистка буферов, цвет черный 
 		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
 		glViewport(0, 0, width, height);
 
 		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
 		textureManager.UpdateTexture(texture1, frame);
+		textureManager.UpdateTexture(texture2, frame);
 
 		window1.SwapBuffers();
 		window1.PollEvents();
@@ -280,8 +302,11 @@ int main() {
 
 	fullScreenVAO1.Delete();
 	fullScreenVBO1.Delete();
+	fullScreenVAO2.Delete();
+	fullScreenVBO2.Delete();
 
 	textureManager.DeleteTexture(texture1);
+	textureManager.DeleteTexture(texture2);
 	textureManager.DeleteTexture(textureCube);
 	shaderProgram1.Delete();
 	//shaderProgram2.Delete();
