@@ -5,18 +5,17 @@ Camera::Camera(int width, int height, glm::vec3 position) {
 	Camera::width = width;
 	Camera::height = height;
 	Position = position;
+	aspectRatio = (float)width / height;
 }
 
 void Camera::updateMatrix(float FOVdeg, float nearPlane, float farPlane) {
-
 	glm::mat4 view = glm::mat4(1.0f);
 	glm::mat4 projection = glm::mat4(1.0f);
 
 	view = glm::lookAt(Position, Position + Orientation, Up);
-	projection = glm::perspective(glm::radians(FOVdeg), (float)(width / height), nearPlane, farPlane);
+	projection = glm::perspective(glm::radians(FOVdeg), aspectRatio, nearPlane, farPlane);
 
 	cameraMatrix = projection * view;
-
 }
 
 glm::mat4 Camera::getMatrix() {
@@ -91,4 +90,8 @@ void Camera::Inputs(GLFWwindow* window) {
 		glfwSetInputMode(window, GLFW_CURSOR, GLFW_CURSOR_NORMAL);
 		firstClick = true;
 	}
+}
+
+void Camera::setAspectRatio(const float& aspectRatio) {
+	this->aspectRatio = aspectRatio;
 }

@@ -12,7 +12,8 @@
 #include"shaderClass.h"
 
 class Camera {
-
+private:
+	float aspectRatio;
 public:
 	glm::vec3 Position;
 	glm::vec3 Orientation = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -35,6 +36,7 @@ public:
 	glm::mat4 getMatrix();
 	void resetMatrix();
 	void setMatrix(glm::mat4& newMatrix);
+	void setAspectRatio(const float& aspectRatio);
 };
 
 #endif // !CAMERA_CLASS_H
