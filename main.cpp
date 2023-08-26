@@ -260,19 +260,6 @@ int main() {
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		fullScreenVAO1.Unbind();
 		fullScreenVBO1.Unbind();
-		
-
-
-		camera.setMatrix(originalCamMatrix);
-		camera.Matrix(shaderProgram1, "camMatrix");
-		glClear(GL_DEPTH_BUFFER_BIT);
-		camera.Inputs(window1.GetWindow());
-		camera.updateMatrix(45.0f, 0.1f, 100.0f);
-		glEnable(GL_DEPTH_TEST);
-		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
-		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
-		glDisable(GL_DEPTH_TEST);
-
 
 		glViewport(width / 2, 0, width / 2, height);
 		fullScreenVAO2.Bind();
@@ -282,32 +269,19 @@ int main() {
 		fullScreenVAO2.Unbind();
 		fullScreenVBO2.Unbind();
 
-
-
 		camera.setMatrix(originalCamMatrix);
 		camera.Matrix(shaderProgram1, "camMatrix");
 		glClear(GL_DEPTH_BUFFER_BIT);
+
 		camera.Inputs(window1.GetWindow());
 		camera.updateMatrix(45.0f, 0.1f, 100.0f);
+
 		glEnable(GL_DEPTH_TEST);
-		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
-		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
-
-
-
-		//camera.setMatrix(originalCamMatrix);
-		//camera.Matrix(shaderProgram1, "camMatrix");
-		//glClear(GL_DEPTH_BUFFER_BIT);
-
-		//camera.Inputs(window1.GetWindow());
-		//camera.updateMatrix(45.0f, 0.1f, 100.0f);
-
-		//glEnable(GL_DEPTH_TEST);
 
 		textureManager.UpdateTexture(texture1, frame);
 		textureManager.UpdateTexture(texture2, frame);
 
-		//glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
+		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
 		glViewport(0, 0, width, height);
 
 		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
