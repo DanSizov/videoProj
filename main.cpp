@@ -40,7 +40,7 @@ GLfloat matrix[16] = {
 //коэффициент для преобразования изображения в шейдере
 GLfloat color = 0.75;
 
-//преобразование векторов вращения и трансляции в матрицу модели 4х4
+//преобразование векторов вращения и трансляции в матрицу модели 4х4 в мировом пространстве, используется для рендеринга 3Д куба
 glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 	//преобразование Rodrigues в матрицу вращения
 	cv::Matx33d rotationMatrix;
@@ -58,8 +58,6 @@ glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 		0.0, 0.0, 1.0
 	);
 	rotationMatrix = opencvToGL * rotationMatrix;
-
-	//инициализация матрицы модели
 
 	//копирование матрицы вращения в матрицу модели
 	for (int i = 0; i < 3; i++) {
@@ -79,6 +77,7 @@ void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager
 	cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), corners, ids);
 
 	if (ids.size() > 0) {
+		//evaluates the 3D pose of each marker relative to the camera. This function returns rotation vectors (rvecs) and translation vectors (tvecs) that describe how the marker relates to the camera.
 		cv::aruco::estimatePoseSingleMarkers(corners, 0.06, cameraMatrix, distCoeffs, rvecs, tvecs);
 		for (int i = 0; i < ids.size(); i++) {
 			cv::Point2f textPosition = corners[i][0];
@@ -97,12 +96,20 @@ void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager
 	}
 }
 
+void framebuffer_size_callback(GLFWwindow* window, int new_width, int new_height) {
+	width = new_width;
+	height = new_height;
+
+	glViewport(0, 0, width, height);
+}
+
 int main() {
 
 
 	cv::Mat cameraMatrix;
 	cv::Mat distCoeffs;
 	WindowManager window1(640, 480, "window1", nullptr);
+	glfwSetFramebufferSizeCallback(window1.GetWindow(), framebuffer_size_callback);
 
 	window1.MakeContextCurrent();
 
@@ -166,14 +173,6 @@ int main() {
 	fullScreenVAO2.Unbind();
 	fullScreenVBO2.Unbind();
 
-	//загрузка и компиляция шейдеров
-
-	//Shader shaderProgram2("matrix.vert", "green.frag");
-	//shaderProgram2.Activate();
-
-	//auto locationMatrix = glGetUniformLocation(shaderProgram2.ID, "sh_matrix");
-	//auto locationVariable = glGetUniformLocation(shaderProgram2.ID, "colorVariable");
-
 	window1.MakeContextCurrent();
 
 	Shader shaderProgram1("default.vert", "default.frag");
@@ -196,7 +195,6 @@ int main() {
 	//cube
 	GLuint textureCube = textureManager.LoadTextureFromFile("brick.png");
 
-	//ширина, высота, колияество каналов изображения
 	float rotationAngle = 0.0f;
 
 	VAO VAO2;
@@ -238,7 +236,6 @@ int main() {
 			lastTime += 1.0;
 		}
 
-		//захват нового кадра
 		cap >> frame;
 		if (frame.empty()) {
 			break;
@@ -263,6 +260,19 @@ int main() {
 		glDrawArrays(GL_TRIANGLES, 0, 6);
 		fullScreenVAO1.Unbind();
 		fullScreenVBO1.Unbind();
+		
+
+
+		camera.setMatrix(originalCamMatrix);
+		camera.Matrix(shaderProgram1, "camMatrix");
+		glClear(GL_DEPTH_BUFFER_BIT);
+		camera.Inputs(window1.GetWindow());
+		camera.updateMatrix(45.0f, 0.1f, 100.0f);
+		glEnable(GL_DEPTH_TEST);
+		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
+		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
+		glDisable(GL_DEPTH_TEST);
+
 
 		glViewport(width / 2, 0, width / 2, height);
 		fullScreenVAO2.Bind();
@@ -272,19 +282,32 @@ int main() {
 		fullScreenVAO2.Unbind();
 		fullScreenVBO2.Unbind();
 
+
+
 		camera.setMatrix(originalCamMatrix);
 		camera.Matrix(shaderProgram1, "camMatrix");
 		glClear(GL_DEPTH_BUFFER_BIT);
-
 		camera.Inputs(window1.GetWindow());
 		camera.updateMatrix(45.0f, 0.1f, 100.0f);
-
 		glEnable(GL_DEPTH_TEST);
+		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
+		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
+
+
+
+		//camera.setMatrix(originalCamMatrix);
+		//camera.Matrix(shaderProgram1, "camMatrix");
+		//glClear(GL_DEPTH_BUFFER_BIT);
+
+		//camera.Inputs(window1.GetWindow());
+		//camera.updateMatrix(45.0f, 0.1f, 100.0f);
+
+		//glEnable(GL_DEPTH_TEST);
 
 		textureManager.UpdateTexture(texture1, frame);
 		textureManager.UpdateTexture(texture2, frame);
 
-		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
+		//glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
 		glViewport(0, 0, width, height);
 
 		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
@@ -295,7 +318,6 @@ int main() {
 		window1.PollEvents();
 	}
 
-	//освобождаем ресурсы
 	VAO2.Delete();
 	VBO2.Delete();
 	EBO2.Delete();
@@ -309,7 +331,6 @@ int main() {
 	textureManager.DeleteTexture(texture2);
 	textureManager.DeleteTexture(textureCube);
 	shaderProgram1.Delete();
-	//shaderProgram2.Delete();
 
 	cap.release();
 
