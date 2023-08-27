@@ -40,53 +40,81 @@ GLfloat matrix[16] = {
 //коэффициент для преобразования изображения в шейдере
 GLfloat color = 0.75;
 
-//преобразование векторов вращения и трансляции в матрицу модели 4х4 в мировом пространстве, используется для рендеринга 3Д куба
+// constant
+glm::mat4 INVERSE_MATRIX (
+	1.0, 0.0, 0.0, 0.0,
+	0.0, -1.0, 0.0, 0.0,
+	0.0, 0.0, -1.0, 0.0,
+	0.0, 0.0, 0.0, 1.0
+);
+
 glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 	//преобразование Rodrigues в матрицу вращения
-	cv::Matx33d rotationMatrix;
+	cv::Mat rotationMatrix;
+	//преобразование вектора Родригеса в матрицу вращения
 	cv::Rodrigues(rvec, rotationMatrix);
 
-	glm::mat4 model = glm::mat4(1.0f);
-	//добавление вектора трансляции в матрицу модели
-	model[3][0] = tvec[0];
-	model[3][1] = tvec[1];
-	model[3][2] = tvec[2];
+	cv::Mat model = cv::Mat::eye(4, 4, CV_64F);
+	rotationMatrix.copyTo(model(cv::Rect(0, 0, 3, 3)));
 
-	cv::Matx33d opencvToGL = cv::Matx33d(
-		1.0, 0.0, 0.0,
-		0.0, 1.0, 0.0,
-		0.0, 0.0, 1.0
-	);
-	rotationMatrix = opencvToGL * rotationMatrix;
+	model.at<double>(0, 3) = tvec[0];
+	model.at<double>(1, 3) = tvec[1];
+	model.at<double>(2, 3) = tvec[2];
 
-	//копирование матрицы вращения в матрицу модели
-	for (int i = 0; i < 3; i++) {
-		for (int j = 0; j < 3; j++) {
-			model[j][i] = (float)rotationMatrix(i, j);
-		}
-	}
+	glm::mat4 glmModel = glm::make_mat4x4(model.ptr<double>());
+	glmModel = glmModel * INVERSE_MATRIX;
+	glmModel = glm::transpose(glmModel);
 
-	return model;
+
+	return glmModel;
 }
 
-void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager, GLuint& textureCube, GLint& locationModelCube, const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, VAO& VAO) {
+std::unique_ptr<cv::Mat> objPoints;
+
+std::unique_ptr<cv::Mat> initializeObjPoints(const double& markerLength) {
+	auto objPoints = std::make_unique<cv::Mat>(4, 1, CV_32FC3);
+	// Set coordinate system
+	objPoints->ptr<cv::Vec3f>(0)[0] = cv::Vec3f(-markerLength / 2.f, markerLength / 2.f, 0);
+	objPoints->ptr<cv::Vec3f>(0)[1] = cv::Vec3f(markerLength / 2.f, markerLength / 2.f, 0);
+	objPoints->ptr<cv::Vec3f>(0)[2] = cv::Vec3f(markerLength / 2.f, -markerLength / 2.f, 0);
+	objPoints->ptr<cv::Vec3f>(0)[3] = cv::Vec3f(-markerLength / 2.f, -markerLength / 2.f, 0);
+	return objPoints;
+}
+
+struct Markers
+{
 	std::vector<int> ids;
-	std::vector<cv::Vec3d> rvecs, tvecs;
-	std::vector<std::vector<cv::Point2f>> corners;
+	std::vector<std::vector<cv::Point2f>> corners, rejected;
+	std::vector<cv::Vec3d> rvecs;
+	std::vector<cv::Vec3d> tvecs;
+	std::vector<glm::mat4> viewMatrixes;
+};
 
-	cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), corners, ids);
+void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager, GLuint& textureCube, const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, VAO& VAO, const Shader& shaderProgram) {
+	Markers markers;
+	cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), markers.corners, markers.ids);
+	objPoints = initializeObjPoints(1);
 
-	if (ids.size() > 0) {
-		//evaluates the 3D pose of each marker relative to the camera. This function returns rotation vectors (rvecs) and translation vectors (tvecs) that describe how the marker relates to the camera.
-		cv::aruco::estimatePoseSingleMarkers(corners, 0.06, cameraMatrix, distCoeffs, rvecs, tvecs);
-		for (int i = 0; i < ids.size(); i++) {
-			cv::Point2f textPosition = corners[i][0];
-			std::string idStr = std::to_string(ids[i]);
+	if (markers.ids.size() > 0) {
+
+			size_t nMarkers = markers.corners.size();
+			markers.rvecs.resize(nMarkers);
+			markers.tvecs.resize(nMarkers);
+			markers.viewMatrixes.resize(nMarkers);
+
+		for (int i = 0; i < markers.ids.size(); i++) {
+			solvePnP(*objPoints, markers.corners[i], cameraMatrix, distCoeffs, markers.rvecs[i], markers.tvecs[i]);
+			markers.viewMatrixes.at(i) = convertRodriguesToMat4(markers.rvecs.at(i), markers.tvecs.at(i));
+
+			cv::Point2f textPosition = markers.corners[i][0];
+			std::string idStr = std::to_string(markers.ids[i]);
 			cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
-			arucoManager.drawAxis(frame, rvecs[i], tvecs[i], 0.1);
-			arucoManager.drawCube(frame, rvecs[i], tvecs[i], 0.05);
-			glm::mat4 markerModel = convertRodriguesToMat4(rvecs[i], tvecs[i]);
+			arucoManager.drawAxis(frame, markers.rvecs[i], markers.tvecs[i], 1);
+			arucoManager.drawCube(frame, markers.rvecs[i], markers.tvecs[i], 1);
 
+			glm::mat4 markerModel = markers.viewMatrixes.at(i);
+
+			GLint locationModelCube = ShaderHelper::GetLocation(shaderProgram.ID, "model");
 			ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
 			VAO.Bind();
 			glBindTexture(GL_TEXTURE_2D, textureCube);
@@ -108,7 +136,7 @@ int main() {
 
 	cv::Mat cameraMatrix;
 	cv::Mat distCoeffs;
-	WindowManager window1(640, 480, "window1", nullptr);
+	WindowManager window1(width, height, "window1", nullptr);
 	glfwSetFramebufferSizeCallback(window1.GetWindow(), framebuffer_size_callback);
 
 	window1.MakeContextCurrent();
@@ -134,25 +162,9 @@ int main() {
 	fs1.release();
 
 	ArucoMarkerManager arucoManager(cameraMatrix, distCoeffs, cv::aruco::DICT_6X6_250);
-
-	//идентификаторы маркеров и их углов
-	std::vector<int> ids;
-	//маркеры и их углы
-	std::vector<std::vector<cv::Point2f>> corners;
-	//поиск маркеров
-
-	std::vector<cv::Vec3d> rvecs, tvecs;
-	arucoManager.detectAndEstimatePose(frame, ids, corners,0.05, rvecs, tvecs);
-
-	for (int i = 0; i < ids.size(); i++) {
-		arucoManager.drawAxis(frame, rvecs[i], tvecs[i], 0.05);
-	}
-
 	TextureManager textureManager;
-
 	GLuint texture1 = textureManager.LoadTextureFromFrame(frame);
 	GLuint texture2 = textureManager.LoadTextureFromFrame(frame);
-
 	VAO fullScreenVAO1;
 	VBO fullScreenVBO1(fullScreenVertices, sizeof(fullScreenVertices));
 
@@ -178,7 +190,7 @@ int main() {
 	Shader shaderProgram1("default.vert", "default.frag");
 	shaderProgram1.Activate();
 
-	Camera camera(800, 800, glm::vec3(1.0f, 0.0f, 5.0f));
+	Camera camera(width, height, glm::vec3(0.0f, 0.0f, 1.0f));
 	camera.Matrix(shaderProgram1, "camMatrix");
 
 	glm::mat4 model1 = glm::mat4(1.0f);
@@ -186,11 +198,6 @@ int main() {
 	model1 = glm::rotate(model1, glm::radians(30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
 	auto locationModel = glGetUniformLocation(shaderProgram1.ID, "model");
 	ShaderHelper::PassMatrix(glm::value_ptr(model1), locationModel);
-
-	glm::mat4 model2 = glm::mat4(1.0f);
-	model2 = glm::translate(model2, glm::vec3(2.0f, 0.0f, 1.0f));
-	model2 = glm::rotate(model2, glm::radians(-30.0f), glm::vec3(0.0f, 1.0f, 0.0f));
-	ShaderHelper::PassMatrix(glm::value_ptr(model2), locationModel);
 
 	//cube
 	GLuint textureCube = textureManager.LoadTextureFromFile("brick.png");
@@ -208,19 +215,10 @@ int main() {
 	VAO2.LinkAttrib(VBO2, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
 	VAO2.LinkAttrib(VBO2, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
 
-	glm::vec3 cubePos = glm::vec3(1.0f, 0.0f, 1.0f);
-
-	glm::mat4 modelCube = glm::mat4(1.0f);
-	modelCube = glm::translate(modelCube, cubePos);
-	modelCube = glm::rotate(modelCube, rotationAngle, glm::vec3(0.0f, 1.0f, 0.0f));
-
-	auto locationModelCube = glGetUniformLocation(shaderProgram1.ID, "model");
-	ShaderHelper::PassMatrix(glm::value_ptr(modelCube), locationModelCube);
 
 	glEnable(GL_DEPTH_TEST);
 
 	glm::mat4 staticCameraMatrix = glm::mat4(1.0f);
-	auto locationCamMatrix = glGetUniformLocation(shaderProgram1.ID, "camMatrix");
 
 	double lastTime = glfwGetTime();
 	int nbFrames = 0;
@@ -252,7 +250,9 @@ int main() {
 
 		shaderProgram1.Activate();
 		ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
-		glViewport(0, 0, width / 2, height);
+
+		//glViewport(0, 0, width / 2, height);
+		glViewport(0, 0, width, height);
 
 		fullScreenVAO1.Bind();
 		fullScreenVBO1.Bind();
@@ -261,13 +261,13 @@ int main() {
 		fullScreenVAO1.Unbind();
 		fullScreenVBO1.Unbind();
 
-		glViewport(width / 2, 0, width / 2, height);
-		fullScreenVAO2.Bind();
-		fullScreenVBO2.Bind();
-		glBindTexture(GL_TEXTURE_2D, texture2);
-		glDrawArrays(GL_TRIANGLES, 0, 6);
-		fullScreenVAO2.Unbind();
-		fullScreenVBO2.Unbind();
+		//glViewport(width / 2, 0, width / 2, height);
+		//fullScreenVAO2.Bind();
+		//fullScreenVBO2.Bind();
+		//glBindTexture(GL_TEXTURE_2D, texture2);
+		//glDrawArrays(GL_TRIANGLES, 0, 6);
+		//fullScreenVAO2.Unbind();
+		//fullScreenVBO2.Unbind();
 
 		camera.setMatrix(originalCamMatrix);
 		camera.Matrix(shaderProgram1, "camMatrix");
@@ -282,14 +282,15 @@ int main() {
 		textureManager.UpdateTexture(texture2, frame);
 
 		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
-		glViewport(0, 0, width, height);
+		//glViewport(0, 0, width, height);
 
-		processMarkersAndDrawCubes(frame, arucoManager, textureCube, locationModelCube, cameraMatrix, distCoeffs, VAO2);
+		processMarkersAndDrawCubes(frame, arucoManager, textureCube, cameraMatrix, distCoeffs, VAO2,  shaderProgram1);
 		textureManager.UpdateTexture(texture1, frame);
 		textureManager.UpdateTexture(texture2, frame);
 
 		window1.SwapBuffers();
 		window1.PollEvents();
+
 	}
 
 	VAO2.Delete();
