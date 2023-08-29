@@ -8,7 +8,7 @@
 //
 ////вектор изображений
 //std::vector<cv::Mat> images;
-//for (const auto& entry : std::filesystem::directory_iterator("C:/CameraCalibrationPhotos")) {
+//for (const auto& entry : std::filesystem::directory_iterator("C:/CameraCalibrationPhotosNew")) {
 //	if (entry.path().extension() == ".jpg") { // Удостоверимся, что это JPG файл
 //		cv::Mat img = cv::imread(entry.path().string());
 //		if (img.empty()) {
@@ -47,14 +47,16 @@
 //std::cout << "Camera Matrix: " << cameraMatrix << std::endl;
 //std::cout << "Distortion coefficients: " << distCoeffs << std::endl;
 //
-////корррекция искажений
-//cv::Mat undistorted;
-//cv::undistort(images[0], undistorted, cameraMatrix, distCoeffs);
-//cv::imshow("Undistorted image", undistorted);
-//cv::waitKey(0);
+//for (const auto& img : images) {
+//	cv::Mat undistorted;
+//	cv::undistort(img, undistorted, cameraMatrix, distCoeffs);
+//	cv::imshow("Undistorted image", undistorted);
+//	cv::waitKey(0);
+//}
+//
 //
 ////сохранение параметров камеры
-//cv::FileStorage fs("camera_parameters.yml", cv::FileStorage::WRITE);
+//cv::FileStorage fs("camera_parametersNew.yml", cv::FileStorage::WRITE);
 //fs << "cameraMatrix" << cameraMatrix;
 //fs << "distCoeffs" << distCoeffs;
 //fs.release();

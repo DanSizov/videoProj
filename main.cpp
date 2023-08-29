@@ -39,7 +39,6 @@ GLfloat matrix[16] = {
 
 //коэффициент для преобразования изображения в шейдере
 GLfloat color = 0.75;
-
 // constant
 glm::mat4 INVERSE_MATRIX (
 	1.0, 0.0, 0.0, 0.0,
@@ -71,7 +70,7 @@ glm::mat4 convertRodriguesToMat4(const cv::Vec3d& rvec, const cv::Vec3d& tvec) {
 
 std::unique_ptr<cv::Mat> objPoints;
 
-std::unique_ptr<cv::Mat> initializeObjPoints(const double& markerLength) {
+std::unique_ptr<cv::Mat> initializeObjPoints(const float& markerLength) {
 	auto objPoints = std::make_unique<cv::Mat>(4, 1, CV_32FC3);
 	// Set coordinate system
 	objPoints->ptr<cv::Vec3f>(0)[0] = cv::Vec3f(-markerLength / 2.f, markerLength / 2.f, 0);
@@ -90,17 +89,18 @@ struct Markers
 	std::vector<glm::mat4> viewMatrixes;
 };
 
-void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager, GLuint& textureCube, const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, VAO& VAO, const Shader& shaderProgram) {
-	Markers markers;
+float length{ 1.0f };
+
+void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager, GLuint& textureCube, const cv::Mat& cameraMatrix, const cv::Mat& distCoeffs, VAO& VAO, const Shader& shaderProgram, Markers& markers) {
 	cv::aruco::detectMarkers(frame, arucoManager.getDictionary(), markers.corners, markers.ids);
-	objPoints = initializeObjPoints(1);
 
 	if (markers.ids.size() > 0) {
+		objPoints = initializeObjPoints(length);
 
-			size_t nMarkers = markers.corners.size();
-			markers.rvecs.resize(nMarkers);
-			markers.tvecs.resize(nMarkers);
-			markers.viewMatrixes.resize(nMarkers);
+		size_t nMarkers = markers.corners.size();
+		markers.rvecs.resize(nMarkers);
+		markers.tvecs.resize(nMarkers);
+		markers.viewMatrixes.resize(nMarkers);
 
 		for (int i = 0; i < markers.ids.size(); i++) {
 			solvePnP(*objPoints, markers.corners[i], cameraMatrix, distCoeffs, markers.rvecs[i], markers.tvecs[i]);
@@ -109,11 +109,9 @@ void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager
 			cv::Point2f textPosition = markers.corners[i][0];
 			std::string idStr = std::to_string(markers.ids[i]);
 			cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
-			arucoManager.drawAxis(frame, markers.rvecs[i], markers.tvecs[i], 1);
-			arucoManager.drawCube(frame, markers.rvecs[i], markers.tvecs[i], 1);
-
+			arucoManager.drawAxis(frame, markers.rvecs[i], markers.tvecs[i], length);
+			arucoManager.drawCube(frame, markers.rvecs[i], markers.tvecs[i], length);
 			glm::mat4 markerModel = markers.viewMatrixes.at(i);
-
 			GLint locationModelCube = ShaderHelper::GetLocation(shaderProgram.ID, "model");
 			ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
 			VAO.Bind();
@@ -143,6 +141,8 @@ int main() {
 
 	//открытие камеры с помощью opencv
 	cv::VideoCapture cap(0);
+	cap.set(cv::CAP_PROP_FRAME_WIDTH, width);
+	cap.set(cv::CAP_PROP_FRAME_HEIGHT, height);
 	if (!cap.isOpened()) {
 		std::cerr << "Failed to open camera" << std::endl;
 		return -1;
@@ -160,6 +160,13 @@ int main() {
 	fs1["cameraMatrix"] >> cameraMatrix;
 	fs1["distCoeffs"] >> distCoeffs;
 	fs1.release();
+
+	// Getting focal lenght from camera calibration parameters
+	double focal_length_x = cameraMatrix.at<double>(0, 0);
+
+	// Calculate Field of View in radians and degrees
+	float FOV = 2.0 * std::atan2(0.5 * height, focal_length_x);
+	float FOV_Deg = glm::degrees(FOV);
 
 	ArucoMarkerManager arucoManager(cameraMatrix, distCoeffs, cv::aruco::DICT_6X6_250);
 	TextureManager textureManager;
@@ -191,6 +198,8 @@ int main() {
 	shaderProgram1.Activate();
 
 	Camera camera(width, height, glm::vec3(0.0f, 0.0f, 1.0f));
+
+
 	camera.Matrix(shaderProgram1, "camMatrix");
 
 	glm::mat4 model1 = glm::mat4(1.0f);
@@ -205,12 +214,12 @@ int main() {
 	float rotationAngle = 0.0f;
 
 	VAO VAO2;
-	VBO VBO2(cubeVerticesMarker, sizeof(cubeVerticesMarker));
-	EBO EBO2(indicesCube, sizeof(indicesCube));
+	VBO VBO2(cubeVertices, sizeof(cubeVertices));
+	//EBO EBO2(indicesCube, sizeof(indicesCube));
 
 	VAO2.Bind();
 	VBO2.Bind();
-	VAO2.BindEBO(EBO2);
+	//VAO2.BindEBO(EBO2);
 
 	VAO2.LinkAttrib(VBO2, 0, 3, GL_FLOAT, 5 * sizeof(float), (void*)0);
 	VAO2.LinkAttrib(VBO2, 1, 2, GL_FLOAT, 5 * sizeof(float), (void*)(3 * sizeof(float)));
@@ -222,7 +231,20 @@ int main() {
 
 	double lastTime = glfwGetTime();
 	int nbFrames = 0;
+	Markers markers;
 
+	cv::Mat map1, map2;
+
+	cv::initUndistortRectifyMap(
+		cameraMatrix,  // матрица камеры
+		distCoeffs,    // коэффициенты искажения
+		cv::Mat(),     // дополнительные параметры
+		cameraMatrix,  // новая матрица камеры, обычно идентична исходной
+		frame.size(),  // размер исправленного изображения
+		CV_16SC2,      // тип первой выходной карты
+		map1,          // первая выходная карта
+		map2           // вторая выходная карта
+	);
 	while (!window1.Close())
 	{
 
@@ -238,7 +260,9 @@ int main() {
 		if (frame.empty()) {
 			break;
 		}
-		
+		cv::Mat undistortedFrame;
+		cv::remap(frame, undistortedFrame, map1, map2, cv::INTER_LINEAR);
+
 		window1.MakeContextCurrent();
 
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -251,7 +275,6 @@ int main() {
 		shaderProgram1.Activate();
 		ShaderHelper::PassMatrix(glm::value_ptr(staticCameraMatrix), locationModel);
 
-		//glViewport(0, 0, width / 2, height);
 		glViewport(0, 0, width, height);
 
 		fullScreenVAO1.Bind();
@@ -261,32 +284,23 @@ int main() {
 		fullScreenVAO1.Unbind();
 		fullScreenVBO1.Unbind();
 
-		//glViewport(width / 2, 0, width / 2, height);
-		//fullScreenVAO2.Bind();
-		//fullScreenVBO2.Bind();
-		//glBindTexture(GL_TEXTURE_2D, texture2);
-		//glDrawArrays(GL_TRIANGLES, 0, 6);
-		//fullScreenVAO2.Unbind();
-		//fullScreenVBO2.Unbind();
-
 		camera.setMatrix(originalCamMatrix);
 		camera.Matrix(shaderProgram1, "camMatrix");
 		glClear(GL_DEPTH_BUFFER_BIT);
 
 		camera.Inputs(window1.GetWindow());
-		camera.updateMatrix(45.0f, 0.1f, 100.0f);
+		camera.updateMatrix(FOV_Deg, 0.1f, 100.0f);
 
 		glEnable(GL_DEPTH_TEST);
 
-		textureManager.UpdateTexture(texture1, frame);
-		textureManager.UpdateTexture(texture2, frame);
+		textureManager.UpdateTexture(texture1, undistortedFrame);
+		textureManager.UpdateTexture(texture2, undistortedFrame);
 
 		glfwGetFramebufferSize(window1.GetWindow(), &width, &height);
-		//glViewport(0, 0, width, height);
 
-		processMarkersAndDrawCubes(frame, arucoManager, textureCube, cameraMatrix, distCoeffs, VAO2,  shaderProgram1);
-		textureManager.UpdateTexture(texture1, frame);
-		textureManager.UpdateTexture(texture2, frame);
+		processMarkersAndDrawCubes(undistortedFrame, arucoManager, textureCube, cameraMatrix, distCoeffs, VAO2,  shaderProgram1, markers);
+		textureManager.UpdateTexture(texture1, undistortedFrame);
+		textureManager.UpdateTexture(texture2, undistortedFrame);
 
 		window1.SwapBuffers();
 		window1.PollEvents();
@@ -295,7 +309,7 @@ int main() {
 
 	VAO2.Delete();
 	VBO2.Delete();
-	EBO2.Delete();
+	//EBO2.Delete();
 
 	fullScreenVAO1.Delete();
 	fullScreenVBO1.Delete();
