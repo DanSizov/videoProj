@@ -18,4 +18,3 @@ unsigned int indicesCube[] = {
 
 #endif // !INDICES_H
 
-

@@ -142,6 +142,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="ArucoMarkerManager.cpp" />
+    <ClCompile Include="Calibration.cpp" />
     <ClCompile Include="Camera.cpp" />
     <ClCompile Include="CameraBackup.cpp" />
     <ClCompile Include="EBO.cpp" />
@@ -163,6 +164,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ArucoMarkerManager.h" />
+    <ClInclude Include="Calibration.h" />
     <ClInclude Include="Camera.h" />
     <ClInclude Include="EBO.h" />
     <ClInclude Include="GLDebug.h" />
