@@ -24,6 +24,7 @@
 #include"TextureManager.h"
 #include"ArucoMarkerManager.h"
 #include"GLDebug.h"
+#include"Calibration.h"
 
 #define GL_CALL(x) x; GLDebug::CheckError(#x);
 
@@ -111,7 +112,9 @@ void processMarkersAndDrawCubes(cv::Mat& frame, ArucoMarkerManager& arucoManager
 			cv::putText(frame, idStr, textPosition, cv::FONT_HERSHEY_SIMPLEX, 0.5, cv::Scalar(0, 0, 255), 2);
 			arucoManager.drawAxis(frame, markers.rvecs[i], markers.tvecs[i], length);
 			arucoManager.drawCube(frame, markers.rvecs[i], markers.tvecs[i], length);
-			glm::mat4 markerModel = markers.viewMatrixes.at(i);
+
+			glm::mat4 markerModel = glm::mat4(1.0f);
+			markerModel = markers.viewMatrixes.at(i) * markerModel;
 			GLint locationModelCube = ShaderHelper::GetLocation(shaderProgram.ID, "model");
 			ShaderHelper::PassMatrix(glm::value_ptr(markerModel), locationModelCube);
 			VAO.Bind();
@@ -130,7 +133,6 @@ void framebuffer_size_callback(GLFWwindow* window, int new_width, int new_height
 }
 
 int main() {
-
 
 	cv::Mat cameraMatrix;
 	cv::Mat distCoeffs;
@@ -156,16 +158,20 @@ int main() {
 		return -1;
 	}
 
-	cv::FileStorage fs1("camera_parameters.yml", cv::FileStorage::READ);
-	fs1["cameraMatrix"] >> cameraMatrix;
-	fs1["distCoeffs"] >> distCoeffs;
-	fs1.release();
+	Calibration calibrator;
+	//calibrator.calibration();
+
+	calibrator.readCameraParameters("camera_parameters_2.yml", cameraMatrix, distCoeffs);
+	//cv::FileStorage fs1("camera_parameters_2.yml", cv::FileStorage::READ);
+	//fs1["cameraMatrix"] >> cameraMatrix;
+	//fs1["distCoeffs"] >> distCoeffs;
+	//fs1.release();
 
 	// Getting focal lenght from camera calibration parameters
 	double focal_length_x = cameraMatrix.at<double>(0, 0);
 
 	// Calculate Field of View in radians and degrees
-	float FOV = 2.0 * std::atan2(0.5 * height, focal_length_x);
+	float FOV = 2.0 * std::atan2(0.5 * (float)height, focal_length_x);
 	float FOV_Deg = glm::degrees(FOV);
 
 	ArucoMarkerManager arucoManager(cameraMatrix, distCoeffs, cv::aruco::DICT_6X6_250);

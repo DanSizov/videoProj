@@ -26,7 +26,14 @@
 //	//ôóíêöèÿ äëÿ ïîèñêà óãëîâ øàõìàòíîé äîñêè
 //	bool found = cv::findChessboardCorners(img, cv::Size(boardWidth, boardHeight), chessboardÑorners);
 //	if (found) {
+//		cv::Mat gray;
+//		cv::cvtColor(img, gray, cv::COLOR_BGR2GRAY);
+//		cv::cornerSubPix(gray, chessboardÑorners, cv::Size(11, 11), cv::Size(-1, -1), cv::TermCriteria(cv::TermCriteria::EPS + cv::TermCriteria::COUNT, 30, 0.1));
+//		cv::drawChessboardCorners(img, cv::Size(boardWidth, boardHeight), chessboardÑorners, found);
 //		imagePoints.push_back(chessboardÑorners);
+//	}
+//	else {
+//		std::cout << "Chessboard corners not found!" << std::endl;
 //	}
 //}
 //
